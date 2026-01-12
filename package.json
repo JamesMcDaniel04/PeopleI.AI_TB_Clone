@@ -1,0 +1,31 @@
+{
+  "name": "testbox-clone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TestBox clone for Salesforce & People.ai integration - generates synthetic sales data using AI",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "npm run migrate --workspace=@testbox/api",
+    "db:seed": "npm run seed --workspace=@testbox/api",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:dev": "docker-compose -f docker/docker-compose.dev.yml up -d"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "npm@10.2.0"
+}
