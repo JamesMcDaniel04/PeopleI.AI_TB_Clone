@@ -34,7 +34,8 @@ export default function SalesforceCallbackPage() {
 
     let state: OAuthState | null = null;
     try {
-      state = JSON.parse(atob(stateParam));
+      const normalizedState = stateParam.replace(/ /g, '+');
+      state = JSON.parse(atob(normalizedState));
     } catch {
       setError('Invalid authorization state. Please try connecting again.');
       return;

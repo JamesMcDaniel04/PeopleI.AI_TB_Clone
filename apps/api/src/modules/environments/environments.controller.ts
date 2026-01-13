@@ -100,10 +100,13 @@ export class EnvironmentsController {
     @CurrentUser() user: User,
     @Query('isSandbox', new ParseBoolPipe({ optional: true })) isSandbox?: boolean,
   ) {
-    // Verify ownership
-    await this.environmentsService.findById(id, user.id);
+    // Verify ownership and resolve environment settings
+    const environment = await this.environmentsService.findById(id, user.id);
 
-    const authUrl = this.salesforceAuthService.getAuthorizationUrl(id, isSandbox);
+    const authUrl = this.salesforceAuthService.getAuthorizationUrl(
+      id,
+      isSandbox ?? environment.isSandbox,
+    );
     return {
       success: true,
       data: { authUrl },

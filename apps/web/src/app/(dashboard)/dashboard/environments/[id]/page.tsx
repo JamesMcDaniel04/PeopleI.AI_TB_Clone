@@ -9,7 +9,6 @@ import { formatRelativeTime, getStatusColor } from '@/lib/utils';
 import {
   ArrowLeft,
   Cloud,
-  CheckCircle,
   XCircle,
   Loader2,
   ExternalLink,
@@ -71,7 +70,7 @@ export default function EnvironmentDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['environment', environmentId] });
       queryClient.invalidateQueries({ queryKey: ['environments'] });
-      statusQuery.remove();
+      queryClient.removeQueries({ queryKey: ['environment-status', environmentId] });
     },
   });
 
@@ -209,19 +208,19 @@ export default function EnvironmentDetailPage() {
               <div className="mt-1 font-medium text-gray-900">
                 {statusData?.instanceUrl?.replace('https://', '') ||
                   environment.salesforceInstanceUrl?.replace('https://', '') ||
-                  '—'}
+                  '-'}
               </div>
             </div>
             <div>
               <span className="text-gray-500">Org ID</span>
               <div className="mt-1 font-medium text-gray-900">
-                {statusData?.orgId || environment.salesforceOrgId || '—'}
+                {statusData?.orgId || environment.salesforceOrgId || '-'}
               </div>
             </div>
             <div>
               <span className="text-gray-500">Last Sync</span>
               <div className="mt-1 font-medium text-gray-900">
-                {environment.lastSyncedAt ? formatRelativeTime(environment.lastSyncedAt) : '—'}
+                {environment.lastSyncedAt ? formatRelativeTime(environment.lastSyncedAt) : '-'}
               </div>
             </div>
           </div>

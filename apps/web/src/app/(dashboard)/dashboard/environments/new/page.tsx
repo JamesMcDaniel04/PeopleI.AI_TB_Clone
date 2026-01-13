@@ -12,7 +12,7 @@ import Link from 'next/link';
 const createEnvSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
-  isSandbox: z.boolean().default(true),
+  isSandbox: z.coerce.boolean().default(true),
 });
 
 type CreateEnvForm = z.infer<typeof createEnvSchema>;

@@ -110,7 +110,15 @@ SALESFORCE_LOGIN_URL=https://login.salesforce.com
 npm run docker:dev
 ```
 
-### 4. Run the Application
+### 4. Run Migrations
+
+```bash
+# Build API (required for migrations) and apply schema
+npm run build --workspace=@testbox/api
+npm run db:migrate
+```
+
+### 5. Run the Application
 
 ```bash
 # Development mode (runs both API and Web)

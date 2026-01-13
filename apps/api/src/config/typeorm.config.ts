@@ -18,4 +18,5 @@ const dataSource = new DataSource({
   logging: process.env.DATABASE_LOGGING === 'true',
 });
 
+export const AppDataSource = dataSource;
 export default dataSource;
