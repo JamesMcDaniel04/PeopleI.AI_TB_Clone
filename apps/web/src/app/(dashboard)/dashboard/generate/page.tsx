@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import {
@@ -34,6 +34,7 @@ interface GenerationConfig {
 
 export default function GeneratePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [config, setConfig] = useState<Partial<GenerationConfig>>({
     recordCounts: {
@@ -44,6 +45,13 @@ export default function GeneratePage() {
       Event: 10,
     },
   });
+
+  useEffect(() => {
+    const templateId = searchParams.get('templateId');
+    if (templateId && !config.templateId) {
+      setConfig((prev) => ({ ...prev, templateId }));
+    }
+  }, [config.templateId, searchParams]);
 
   const { data: environments } = useQuery({
     queryKey: ['environments'],

@@ -4,10 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { TemplatesService } from './modules/templates/templates.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const templatesService = app.get(TemplatesService);
 
   // Security headers
   app.use(helmet());
@@ -51,6 +53,12 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
+
+  try {
+    await templatesService.seedDefaultTemplates();
+  } catch (error: any) {
+    console.error('Failed to seed default templates:', error?.message || error);
+  }
 
   const port = configService.get<number>('PORT') || 3001;
   await app.listen(port);

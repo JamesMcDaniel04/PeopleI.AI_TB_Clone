@@ -99,7 +99,7 @@ OPENAI_API_KEY=sk-your-openai-api-key
 # Salesforce Connected App
 SALESFORCE_CLIENT_ID=your_client_id
 SALESFORCE_CLIENT_SECRET=your_client_secret
-SALESFORCE_CALLBACK_URL=http://localhost:3000/api/salesforce/callback
+SALESFORCE_CALLBACK_URL=http://localhost:3000/salesforce/callback
 SALESFORCE_LOGIN_URL=https://login.salesforce.com
 ```
 
@@ -129,7 +129,7 @@ npm run dev
 2. Click "New Connected App"
 3. Configure:
    - Enable OAuth Settings
-   - Callback URL: `http://localhost:3000/api/salesforce/callback`
+   - Callback URL: `http://localhost:3000/salesforce/callback`
    - OAuth Scopes: `api`, `refresh_token`
 4. Save and copy Client ID and Secret
 

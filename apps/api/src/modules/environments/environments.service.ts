@@ -25,7 +25,6 @@ export class EnvironmentsService {
   async findById(id: string, userId: string): Promise<Environment> {
     const environment = await this.environmentsRepository.findOne({
       where: { id },
-      relations: ['credential'],
     });
 
     if (!environment) {

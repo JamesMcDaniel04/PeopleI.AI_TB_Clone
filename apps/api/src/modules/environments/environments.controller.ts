@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   Query,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { EnvironmentsService } from './environments.service';
@@ -97,7 +98,7 @@ export class EnvironmentsController {
   async getAuthUrl(
     @Param('id') id: string,
     @CurrentUser() user: User,
-    @Query('isSandbox') isSandbox?: boolean,
+    @Query('isSandbox', new ParseBoolPipe({ optional: true })) isSandbox?: boolean,
   ) {
     // Verify ownership
     await this.environmentsService.findById(id, user.id);
