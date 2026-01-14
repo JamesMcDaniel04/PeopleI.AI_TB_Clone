@@ -103,8 +103,9 @@ export class EnvironmentsController {
     // Verify ownership and resolve environment settings
     const environment = await this.environmentsService.findById(id, user.id);
 
-    const authUrl = this.salesforceAuthService.getAuthorizationUrl(
+    const authUrl = await this.salesforceAuthService.getAuthorizationUrl(
       id,
+      user.id,
       isSandbox ?? environment.isSandbox,
     );
     return {
@@ -125,7 +126,7 @@ export class EnvironmentsController {
     await this.environmentsService.findById(id, user.id);
 
     // Exchange code for tokens
-    await this.salesforceAuthService.handleCallback(id, dto.code, dto.isSandbox);
+    await this.salesforceAuthService.handleCallback(id, user.id, dto.code, dto.state);
 
     const environment = await this.environmentsService.findById(id, user.id);
     return {

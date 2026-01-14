@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 interface OAuthState {
   environmentId: string;
   isSandbox?: boolean;
+  state: string;
 }
 
 export default function SalesforceCallbackPage() {
@@ -41,13 +42,13 @@ export default function SalesforceCallbackPage() {
       return;
     }
 
-    if (!state?.environmentId) {
+    if (!state?.environmentId || !state?.state) {
       setError('Missing environment reference. Please try connecting again.');
       return;
     }
 
     api.environments
-      .handleCallback(state.environmentId, code, state.isSandbox)
+      .handleCallback(state.environmentId, code, state.isSandbox, state.state)
       .then(() => {
         setMessage('Salesforce connected. Redirecting...');
         router.replace(`/dashboard/environments/${state!.environmentId}`);

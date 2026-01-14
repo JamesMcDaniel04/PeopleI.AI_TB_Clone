@@ -10,10 +10,11 @@ import { SalesforceObjectMapperService } from './services/salesforce-object-mapp
 import { EncryptionService } from './services/encryption.service';
 import { Environment } from '../environments/entities/environment.entity';
 import { SalesforceCredential } from '../environments/entities/salesforce-credential.entity';
+import { SalesforceOAuthState } from './entities/salesforce-oauth-state.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Environment, SalesforceCredential]),
+    TypeOrmModule.forFeature([Environment, SalesforceCredential, SalesforceOAuthState]),
     HttpModule,
   ],
   controllers: [SalesforceController],

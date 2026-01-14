@@ -6,10 +6,9 @@ import { PromptBuilderService } from './services/prompt-builder.service';
 import { DataTransformerService } from './services/data-transformer.service';
 import { TemplatesModule } from '../templates/templates.module';
 import { DatasetsModule } from '../datasets/datasets.module';
-import { JobsModule } from '../jobs/jobs.module';
 
 @Module({
-  imports: [TemplatesModule, DatasetsModule, JobsModule],
+  imports: [TemplatesModule, DatasetsModule],
   controllers: [GeneratorController],
   providers: [
     GeneratorService,

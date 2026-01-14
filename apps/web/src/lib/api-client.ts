@@ -93,8 +93,8 @@ export const api = {
     delete: (id: string) => apiClient.delete(`/environments/${id}`),
     getAuthUrl: (id: string, isSandbox?: boolean) =>
       apiClient.get(`/environments/${id}/auth-url`, { params: { isSandbox } }),
-    handleCallback: (id: string, code: string, isSandbox?: boolean) =>
-      apiClient.post(`/environments/${id}/callback`, { code, isSandbox }),
+    handleCallback: (id: string, code: string, isSandbox?: boolean, state?: string) =>
+      apiClient.post(`/environments/${id}/callback`, { code, isSandbox, state }),
     disconnect: (id: string) => apiClient.post(`/environments/${id}/disconnect`),
     getStatus: (id: string) => apiClient.get(`/environments/${id}/status`),
   },
@@ -103,6 +103,27 @@ export const api = {
   templates: {
     list: () => apiClient.get('/templates'),
     get: (id: string) => apiClient.get(`/templates/${id}`),
+    create: (data: {
+      name: string;
+      description?: string;
+      category?: string;
+      industry?: string;
+      config?: Record<string, any>;
+    }) => apiClient.post('/templates', data),
+    update: (id: string, data: {
+      name?: string;
+      description?: string;
+      category?: string;
+      industry?: string;
+      config?: Record<string, any>;
+    }) => apiClient.patch(`/templates/${id}`, data),
+    upsertPrompts: (id: string, prompts: Array<{
+      salesforceObject: string;
+      systemPrompt: string;
+      userPromptTemplate: string;
+      temperature?: number;
+      outputSchema?: Record<string, any>;
+    }>) => apiClient.put(`/templates/${id}/prompts`, { prompts }),
   },
 
   // Generator
@@ -142,5 +163,12 @@ export const api = {
       apiClient.get(`/salesforce/${environmentId}/query`, { params: { q: soql } }),
     getRecord: (environmentId: string, objectType: string, recordId: string) =>
       apiClient.get(`/salesforce/${environmentId}/records/${objectType}/${recordId}`),
+  },
+
+  // Jobs
+  jobs: {
+    list: (params?: { datasetId?: string; type?: string; status?: string; limit?: number }) =>
+      apiClient.get('/jobs', { params }),
+    get: (id: string) => apiClient.get(`/jobs/${id}`),
   },
 };

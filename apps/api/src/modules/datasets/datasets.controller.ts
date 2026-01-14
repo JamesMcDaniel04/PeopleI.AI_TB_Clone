@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { DatasetsService } from './datasets.service';
-import { SalesforceService } from '../salesforce/salesforce.service';
+import { QueueService } from '../jobs/services/queue.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
@@ -21,7 +21,7 @@ import { User } from '../users/entities/user.entity';
 export class DatasetsController {
   constructor(
     private datasetsService: DatasetsService,
-    private salesforceService: SalesforceService,
+    private queueService: QueueService,
   ) {}
 
   @Get()
@@ -128,17 +128,17 @@ export class DatasetsController {
       };
     }
 
-    const result = await this.salesforceService.cleanupRecords(
-      dataset.environmentId,
-      injectedRecords,
-    );
+    const job = await this.queueService.addCleanupJob({
+      datasetId: dataset.id,
+      environmentId: dataset.environmentId,
+      userId: user.id,
+    });
 
     return {
       success: true,
       data: {
-        deleted: result.success,
-        failed: result.failed,
-        message: `Cleaned up ${result.success} records, ${result.failed} failed`,
+        jobId: String(job.id),
+        message: 'Cleanup job queued. Check job status for progress.',
       },
     };
   }

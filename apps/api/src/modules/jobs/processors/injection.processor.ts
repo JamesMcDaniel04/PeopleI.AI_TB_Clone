@@ -7,6 +7,7 @@ import { DatasetsService } from '../../datasets/datasets.service';
 import { DatasetStatus } from '../../datasets/entities/dataset.entity';
 import { RecordStatus } from '../../datasets/entities/dataset-record.entity';
 import { InjectionJobData } from '../services/queue.service';
+import { JobsService } from '../jobs.service';
 
 @Processor('injection')
 export class InjectionProcessor extends WorkerHost {
@@ -16,6 +17,7 @@ export class InjectionProcessor extends WorkerHost {
     private salesforceService: SalesforceService,
     private datasetsService: DatasetsService,
     private eventEmitter: EventEmitter2,
+    private jobsService: JobsService,
   ) {
     super();
   }
@@ -105,17 +107,28 @@ export class InjectionProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('active')
-  onActive(job: Job) {
+  async onActive(job: Job) {
     this.logger.log(`Processing injection job ${job.id}`);
+    await this.jobsService.markProcessing('injection', String(job.id), job.attemptsMade);
   }
 
   @OnWorkerEvent('completed')
-  onCompleted(job: Job) {
+  async onCompleted(job: Job) {
     this.logger.log(`Completed injection job ${job.id}`);
+    await this.jobsService.markCompleted('injection', String(job.id), {
+      datasetId: job.data?.datasetId,
+    });
   }
 
   @OnWorkerEvent('failed')
-  onFailed(job: Job, err: Error) {
+  async onFailed(job: Job, err: Error) {
     this.logger.error(`Failed injection job ${job.id}: ${err.message}`);
+    await this.jobsService.markFailed('injection', String(job.id), err.message);
+  }
+
+  @OnWorkerEvent('progress')
+  async onProgress(job: Job, progress: number) {
+    this.logger.debug(`Injection job ${job.id} progress: ${progress}%`);
+    await this.jobsService.updateProgress('injection', String(job.id), progress);
   }
 }

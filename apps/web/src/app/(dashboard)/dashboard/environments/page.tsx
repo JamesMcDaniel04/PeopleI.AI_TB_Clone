@@ -95,6 +95,7 @@ function EnvironmentCard({
   const [showMenu, setShowMenu] = useState(false);
 
   const isConnected = environment.status === 'connected';
+  const isConnecting = environment.status === 'connecting';
 
   return (
     <div className="card">
@@ -103,12 +104,12 @@ function EnvironmentCard({
           <div className="flex items-center">
             <div
               className={`p-2 rounded-lg ${
-                isConnected ? 'bg-green-100' : 'bg-gray-100'
+                isConnected ? 'bg-green-100' : isConnecting ? 'bg-blue-100' : 'bg-gray-100'
               }`}
             >
               <Cloud
                 className={`h-6 w-6 ${
-                  isConnected ? 'text-green-600' : 'text-gray-400'
+                  isConnected ? 'text-green-600' : isConnecting ? 'text-blue-600' : 'text-gray-400'
                 }`}
               />
             </div>
@@ -123,6 +124,11 @@ function EnvironmentCard({
                   <>
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Connected
+                  </>
+                ) : isConnecting ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Connecting
                   </>
                 ) : (
                   <>

@@ -4,9 +4,11 @@ import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
+import { randomUUID } from 'crypto';
 import { Environment, EnvironmentStatus } from '../../environments/entities/environment.entity';
 import { SalesforceCredential } from '../../environments/entities/salesforce-credential.entity';
 import { EncryptionService } from './encryption.service';
+import { SalesforceOAuthState } from '../entities/salesforce-oauth-state.entity';
 
 interface TokenResponse {
   access_token: string;
@@ -35,14 +37,33 @@ export class SalesforceAuthService {
     private environmentsRepository: Repository<Environment>,
     @InjectRepository(SalesforceCredential)
     private credentialsRepository: Repository<SalesforceCredential>,
+    @InjectRepository(SalesforceOAuthState)
+    private oauthStatesRepository: Repository<SalesforceOAuthState>,
   ) {}
 
-  getAuthorizationUrl(environmentId: string, isSandbox = false): string {
+  async getAuthorizationUrl(
+    environmentId: string,
+    userId: string,
+    isSandbox = false,
+  ): Promise<string> {
     const clientId = this.configService.get<string>('salesforce.clientId');
     const callbackUrl = this.configService.get<string>('salesforce.callbackUrl');
+
+    if (!clientId || !callbackUrl) {
+      throw new BadRequestException('Salesforce OAuth is not configured');
+    }
+
     const baseUrl = this.getLoginUrl(isSandbox);
 
-    const state = Buffer.from(JSON.stringify({ environmentId, isSandbox })).toString('base64');
+    await this.environmentsRepository.update(environmentId, {
+      status: EnvironmentStatus.CONNECTING,
+      isSandbox,
+    });
+
+    const stateToken = await this.createOAuthState(environmentId, userId, isSandbox);
+    const state = Buffer.from(
+      JSON.stringify({ environmentId, isSandbox, state: stateToken }),
+    ).toString('base64');
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -55,54 +76,72 @@ export class SalesforceAuthService {
     return `${baseUrl}/services/oauth2/authorize?${params.toString()}`;
   }
 
-  async handleCallback(environmentId: string, code: string, isSandbox = false): Promise<void> {
-    const baseUrl = this.getLoginUrl(isSandbox);
+  async handleCallback(
+    environmentId: string,
+    userId: string,
+    code: string,
+    stateToken: string,
+  ): Promise<void> {
+    const oauthState = await this.validateOAuthState(environmentId, userId, stateToken);
+    const baseUrl = this.getLoginUrl(oauthState.isSandbox);
 
-    // Exchange code for tokens
-    const tokenResponse = await this.exchangeCodeForTokens(code, baseUrl);
+    try {
+      // Exchange code for tokens
+      const tokenResponse = await this.exchangeCodeForTokens(code, baseUrl);
 
-    // Get user info
-    const userInfo = await this.getUserInfo(tokenResponse.access_token, tokenResponse.instance_url);
+      // Get user info
+      const userInfo = await this.getUserInfo(
+        tokenResponse.access_token,
+        tokenResponse.instance_url,
+      );
 
-    // Encrypt tokens
-    const accessTokenEncrypted = this.encryptionService.encrypt(tokenResponse.access_token);
-    const refreshTokenEncrypted = this.encryptionService.encrypt(tokenResponse.refresh_token);
+      // Encrypt tokens
+      const accessTokenEncrypted = this.encryptionService.encrypt(tokenResponse.access_token);
+      const refreshTokenEncrypted = this.encryptionService.encrypt(tokenResponse.refresh_token);
 
-    // Token expires in 2 hours by default
-    const tokenExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      // Token expires in 2 hours by default
+      const tokenExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
-    // Save or update credential
-    let credential = await this.credentialsRepository.findOne({
-      where: { environmentId },
-    });
-
-    if (credential) {
-      credential.accessTokenEncrypted = accessTokenEncrypted;
-      credential.refreshTokenEncrypted = refreshTokenEncrypted;
-      credential.tokenExpiresAt = tokenExpiresAt;
-      credential.connectedUserEmail = userInfo.email;
-      credential.connectedUserId = userInfo.user_id;
-    } else {
-      credential = this.credentialsRepository.create({
-        environmentId,
-        accessTokenEncrypted,
-        refreshTokenEncrypted,
-        tokenExpiresAt,
-        connectedUserEmail: userInfo.email,
-        connectedUserId: userInfo.user_id,
+      // Save or update credential
+      let credential = await this.credentialsRepository.findOne({
+        where: { environmentId },
       });
+
+      if (credential) {
+        credential.accessTokenEncrypted = accessTokenEncrypted;
+        credential.refreshTokenEncrypted = refreshTokenEncrypted;
+        credential.tokenExpiresAt = tokenExpiresAt;
+        credential.connectedUserEmail = userInfo.email;
+        credential.connectedUserId = userInfo.user_id;
+      } else {
+        credential = this.credentialsRepository.create({
+          environmentId,
+          accessTokenEncrypted,
+          refreshTokenEncrypted,
+          tokenExpiresAt,
+          connectedUserEmail: userInfo.email,
+          connectedUserId: userInfo.user_id,
+        });
+      }
+
+      await this.credentialsRepository.save(credential);
+
+      // Update environment
+      await this.environmentsRepository.update(environmentId, {
+        salesforceInstanceUrl: tokenResponse.instance_url,
+        salesforceOrgId: userInfo.organization_id,
+        status: EnvironmentStatus.CONNECTED,
+        isSandbox: oauthState.isSandbox,
+        lastSyncedAt: new Date(),
+      });
+    } catch (error) {
+      await this.environmentsRepository.update(environmentId, {
+        status: EnvironmentStatus.ERROR,
+      });
+      throw error;
+    } finally {
+      await this.oauthStatesRepository.delete({ id: oauthState.id });
     }
-
-    await this.credentialsRepository.save(credential);
-
-    // Update environment
-    await this.environmentsRepository.update(environmentId, {
-      salesforceInstanceUrl: tokenResponse.instance_url,
-      salesforceOrgId: userInfo.organization_id,
-      status: EnvironmentStatus.CONNECTED,
-      isSandbox,
-      lastSyncedAt: new Date(),
-    });
   }
 
   async refreshAccessToken(environmentId: string): Promise<string> {
@@ -120,6 +159,10 @@ export class SalesforceAuthService {
 
     const clientId = this.configService.get<string>('salesforce.clientId');
     const clientSecret = this.configService.get<string>('salesforce.clientSecret');
+
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException('Salesforce OAuth is not configured');
+    }
 
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
@@ -214,6 +257,10 @@ export class SalesforceAuthService {
     const clientSecret = this.configService.get<string>('salesforce.clientSecret');
     const callbackUrl = this.configService.get<string>('salesforce.callbackUrl');
 
+    if (!clientId || !clientSecret || !callbackUrl) {
+      throw new BadRequestException('Salesforce OAuth is not configured');
+    }
+
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: clientId!,
@@ -260,5 +307,48 @@ export class SalesforceAuthService {
       return defaultUrl.replace('login.salesforce.com', 'test.salesforce.com');
     }
     return defaultUrl;
+  }
+
+  private async createOAuthState(
+    environmentId: string,
+    userId: string,
+    isSandbox: boolean,
+  ): Promise<string> {
+    const ttlMinutes = this.configService.get<number>('salesforce.oauthStateTtlMinutes') || 15;
+    const stateToken = randomUUID();
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
+
+    await this.oauthStatesRepository.save(
+      this.oauthStatesRepository.create({
+        state: stateToken,
+        environmentId,
+        userId,
+        isSandbox,
+        expiresAt,
+      }),
+    );
+
+    return stateToken;
+  }
+
+  private async validateOAuthState(
+    environmentId: string,
+    userId: string,
+    stateToken: string,
+  ): Promise<SalesforceOAuthState> {
+    const state = await this.oauthStatesRepository.findOne({
+      where: { state: stateToken, environmentId, userId },
+    });
+
+    if (!state) {
+      throw new BadRequestException('Invalid OAuth state');
+    }
+
+    if (state.expiresAt.getTime() < Date.now()) {
+      await this.oauthStatesRepository.delete({ id: state.id });
+      throw new BadRequestException('OAuth state expired');
+    }
+
+    return state;
   }
 }

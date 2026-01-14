@@ -6,6 +6,10 @@ export class SalesforceCallbackDto {
   @IsString()
   code: string;
 
+  @ApiProperty({ description: 'OAuth state token from Salesforce' })
+  @IsString()
+  state: string;
+
   @ApiPropertyOptional({ description: 'Whether this is a sandbox org', default: false })
   @IsOptional()
   @IsBoolean()

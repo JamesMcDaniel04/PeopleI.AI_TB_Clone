@@ -1,5 +1,8 @@
 import dataSource from '../../config/typeorm.config';
+import { Repository } from 'typeorm';
 import { Template, TemplateCategory, Industry } from '../../modules/templates/entities/template.entity';
+import { TemplatePrompt } from '../../modules/templates/entities/template-prompt.entity';
+import { DEFAULT_TEMPLATE_PROMPTS } from '../../modules/templates/default-prompts';
 
 const defaultTemplates: Partial<Template>[] = [
   {
@@ -90,15 +93,45 @@ const defaultTemplates: Partial<Template>[] = [
 
 async function seedTemplates(): Promise<void> {
   const templateRepo = dataSource.getRepository(Template);
+  const promptRepo = dataSource.getRepository(TemplatePrompt);
   const existingCount = await templateRepo.count({ where: { isSystem: true } });
 
   if (existingCount > 0) {
     console.log('System templates already seeded. Skipping.');
+    await seedTemplatePrompts(templateRepo, promptRepo);
     return;
   }
 
   await templateRepo.save(templateRepo.create(defaultTemplates));
   console.log(`Seeded ${defaultTemplates.length} system templates.`);
+
+  await seedTemplatePrompts(templateRepo, promptRepo);
+}
+
+async function seedTemplatePrompts(
+  templateRepo: Repository<Template>,
+  promptRepo: Repository<TemplatePrompt>,
+): Promise<void> {
+  const systemTemplates = await templateRepo.find({ where: { isSystem: true } });
+
+  for (const template of systemTemplates) {
+    const existingPrompts = await promptRepo.find({ where: { templateId: template.id } });
+    const existingTypes = new Set(existingPrompts.map((prompt) => prompt.salesforceObject));
+
+    const missingPrompts = DEFAULT_TEMPLATE_PROMPTS.filter(
+      (prompt) => !existingTypes.has(prompt.salesforceObject),
+    ).map((prompt) =>
+      promptRepo.create({
+        ...prompt,
+        templateId: template.id,
+      }),
+    );
+
+    if (missingPrompts.length > 0) {
+      await promptRepo.save(missingPrompts);
+      console.log(`Seeded ${missingPrompts.length} prompts for template ${template.name}.`);
+    }
+  }
 }
 
 async function run(): Promise<void> {

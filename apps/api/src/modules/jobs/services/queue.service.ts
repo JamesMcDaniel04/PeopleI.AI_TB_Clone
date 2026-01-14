@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
+import { JobsService } from '../jobs.service';
+import { JobType, JobStatus } from '../entities/job.entity';
 
 export interface GenerationJobData {
   datasetId: string;
@@ -27,12 +29,13 @@ export class QueueService {
     @InjectQueue('generation') private generationQueue: Queue<GenerationJobData>,
     @InjectQueue('injection') private injectionQueue: Queue<InjectionJobData>,
     @InjectQueue('cleanup') private cleanupQueue: Queue<CleanupJobData>,
+    private jobsService: JobsService,
   ) {}
 
   async addGenerationJob(data: GenerationJobData): Promise<Job<GenerationJobData>> {
     this.logger.log(`Adding generation job for dataset ${data.datasetId}`);
 
-    return this.generationQueue.add('generate', data, {
+    const job = await this.generationQueue.add('generate', data, {
       attempts: 3,
       backoff: {
         type: 'exponential',
@@ -41,12 +44,25 @@ export class QueueService {
       removeOnComplete: 100,
       removeOnFail: 500,
     });
+
+    await this.jobsService.createJob({
+      type: JobType.DATA_GENERATION,
+      status: JobStatus.PENDING,
+      userId: data.userId,
+      datasetId: data.datasetId,
+      payload: data,
+      queueName: 'generation',
+      queueJobId: String(job.id),
+      maxAttempts: 3,
+    });
+
+    return job;
   }
 
   async addInjectionJob(data: InjectionJobData): Promise<Job<InjectionJobData>> {
     this.logger.log(`Adding injection job for dataset ${data.datasetId}`);
 
-    return this.injectionQueue.add('inject', data, {
+    const job = await this.injectionQueue.add('inject', data, {
       attempts: 3,
       backoff: {
         type: 'exponential',
@@ -55,12 +71,25 @@ export class QueueService {
       removeOnComplete: 100,
       removeOnFail: 500,
     });
+
+    await this.jobsService.createJob({
+      type: JobType.DATA_INJECTION,
+      status: JobStatus.PENDING,
+      userId: data.userId,
+      datasetId: data.datasetId,
+      payload: data,
+      queueName: 'injection',
+      queueJobId: String(job.id),
+      maxAttempts: 3,
+    });
+
+    return job;
   }
 
   async addCleanupJob(data: CleanupJobData): Promise<Job<CleanupJobData>> {
     this.logger.log(`Adding cleanup job for dataset ${data.datasetId}`);
 
-    return this.cleanupQueue.add('cleanup', data, {
+    const job = await this.cleanupQueue.add('cleanup', data, {
       attempts: 2,
       backoff: {
         type: 'fixed',
@@ -69,6 +98,19 @@ export class QueueService {
       removeOnComplete: 50,
       removeOnFail: 100,
     });
+
+    await this.jobsService.createJob({
+      type: JobType.CLEANUP,
+      status: JobStatus.PENDING,
+      userId: data.userId,
+      datasetId: data.datasetId,
+      payload: data,
+      queueName: 'cleanup',
+      queueJobId: String(job.id),
+      maxAttempts: 2,
+    });
+
+    return job;
   }
 
   async getGenerationJobStatus(jobId: string): Promise<{

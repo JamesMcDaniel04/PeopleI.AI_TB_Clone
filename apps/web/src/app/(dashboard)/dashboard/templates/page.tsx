@@ -21,11 +21,17 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Data Templates</h1>
-        <p className="mt-1 text-gray-600">
-          Choose a template to generate realistic demo data for different scenarios
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Data Templates</h1>
+          <p className="mt-1 text-gray-600">
+            Choose a template to generate realistic demo data for different scenarios
+          </p>
+        </div>
+        <Link href="/dashboard/templates/new" className="btn btn-primary btn-md">
+          <Sparkles className="mr-2 h-4 w-4" />
+          New Template
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -92,14 +98,22 @@ function TemplateCard({ template }: { template: any }) {
       </div>
 
       <div className="px-6 py-3 bg-gray-50 border-t">
-        <Link
-          href={`/dashboard/generate?templateId=${template.id}`}
-          className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
-        >
-          <Sparkles className="mr-1.5 h-4 w-4" />
-          Use Template
-          <ArrowRight className="ml-1 h-4 w-4" />
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href={`/dashboard/generate?templateId=${template.id}`}
+            className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
+          >
+            <Sparkles className="mr-1.5 h-4 w-4" />
+            Use Template
+            <ArrowRight className="ml-1 h-4 w-4" />
+          </Link>
+          <Link
+            href={`/dashboard/templates/${template.id}`}
+            className="text-sm text-gray-600 hover:text-gray-900"
+          >
+            Manage
+          </Link>
+        </div>
       </div>
     </div>
   );

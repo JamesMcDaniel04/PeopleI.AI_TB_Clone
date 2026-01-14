@@ -101,6 +101,7 @@ SALESFORCE_CLIENT_ID=your_client_id
 SALESFORCE_CLIENT_SECRET=your_client_secret
 SALESFORCE_CALLBACK_URL=http://localhost:3000/salesforce/callback
 SALESFORCE_LOGIN_URL=https://login.salesforce.com
+SALESFORCE_OAUTH_STATE_TTL_MINUTES=15
 ```
 
 ### 3. Start Infrastructure (Docker)
@@ -123,6 +124,9 @@ npm run db:migrate
 ```bash
 # Development mode (runs both API and Web)
 npm run dev
+
+# Run the background worker (queues, generation, injection)
+npm run dev:worker
 ```
 
 - API: http://localhost:3001
@@ -239,6 +243,7 @@ docker-compose -f docker/docker-compose.dev.yml up -d
 | `SALESFORCE_CLIENT_SECRET` | Salesforce Connected App Secret | Yes |
 | `SALESFORCE_CALLBACK_URL` | OAuth callback URL | Yes |
 | `SALESFORCE_LOGIN_URL` | Salesforce login URL | No |
+| `SALESFORCE_OAUTH_STATE_TTL_MINUTES` | OAuth state TTL (minutes) | No |
 
 ## Development
 

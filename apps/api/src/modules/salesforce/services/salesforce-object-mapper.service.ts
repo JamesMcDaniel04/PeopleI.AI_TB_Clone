@@ -76,6 +76,13 @@ export class SalesforceObjectMapperService {
       delete data.WhatId_localId;
     }
 
+    // Remove internal metadata fields
+    for (const key of Object.keys(data)) {
+      if (key.startsWith('_') || data[key] === undefined) {
+        delete data[key];
+      }
+    }
+
     return data;
   }
 
@@ -125,6 +132,90 @@ export class SalesforceObjectMapperService {
       valid: errors.length === 0,
       errors,
     };
+  }
+
+  /**
+   * Validate required fields and relationship mappings before injection.
+   */
+  validateRecords(
+    records: DatasetRecord[],
+    idMap: Map<string, string>,
+  ): {
+    valid: DatasetRecord[];
+    failed: { record: DatasetRecord; error: string }[];
+  } {
+    const valid: DatasetRecord[] = [];
+    const failed: { record: DatasetRecord; error: string }[] = [];
+
+    for (const record of records) {
+      const errors: string[] = [];
+      const data = record.data || {};
+
+      switch (record.salesforceObject) {
+        case 'Account':
+          if (!data.Name) {
+            errors.push('Missing Account Name');
+          }
+          break;
+        case 'Contact':
+          if (!data.LastName) {
+            errors.push('Missing Contact LastName');
+          }
+          if (!record.parentLocalId || !idMap.has(record.parentLocalId)) {
+            errors.push('Missing or invalid Account reference');
+          }
+          break;
+        case 'Opportunity':
+          if (!data.Name) {
+            errors.push('Missing Opportunity Name');
+          }
+          if (!data.StageName) {
+            errors.push('Missing Opportunity StageName');
+          }
+          if (!data.CloseDate) {
+            errors.push('Missing Opportunity CloseDate');
+          }
+          if (!record.parentLocalId || !idMap.has(record.parentLocalId)) {
+            errors.push('Missing or invalid Account reference');
+          }
+          break;
+        case 'Task':
+          if (!data.Subject) {
+            errors.push('Missing Task Subject');
+          }
+          if (data.WhoId_localId && !idMap.has(data.WhoId_localId)) {
+            errors.push('Missing Contact reference');
+          }
+          if (data.WhatId_localId && !idMap.has(data.WhatId_localId)) {
+            errors.push('Missing Opportunity reference');
+          }
+          break;
+        case 'Event':
+          if (!data.Subject) {
+            errors.push('Missing Event Subject');
+          }
+          if (!data.StartDateTime || !data.EndDateTime) {
+            errors.push('Missing Event Start/End time');
+          }
+          if (data.WhoId_localId && !idMap.has(data.WhoId_localId)) {
+            errors.push('Missing Contact reference');
+          }
+          if (data.WhatId_localId && !idMap.has(data.WhatId_localId)) {
+            errors.push('Missing Opportunity reference');
+          }
+          break;
+        default:
+          break;
+      }
+
+      if (errors.length > 0) {
+        failed.push({ record, error: errors.join('; ') });
+      } else {
+        valid.push(record);
+      }
+    }
+
+    return { valid, failed };
   }
 
   /**

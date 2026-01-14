@@ -66,14 +66,29 @@ export class SalesforceService {
 
       this.logger.log(`Injecting ${objectRecords.length} ${objectType} records`);
 
+      const validation = this.objectMapper.validateRecords(objectRecords, idMap);
+
+      validation.failed.forEach(({ record, error }) => {
+        result.failed.push({
+          localId: record.localId,
+          error,
+        });
+        result.summary.failed++;
+      });
+
+      const validRecords = validation.valid;
+      if (validRecords.length === 0) {
+        continue;
+      }
+
       // Transform records (replace local IDs with Salesforce IDs)
-      const transformedRecords = objectRecords.map((record) => ({
+      const transformedRecords = validRecords.map((record) => ({
         ...record,
         transformedData: this.objectMapper.transformForInjection(record, idMap),
       }));
 
       // Choose API based on record count
-      const shouldUseBulkApi = useBulkApi && objectRecords.length > bulkThreshold;
+      const shouldUseBulkApi = useBulkApi && validRecords.length > bulkThreshold;
 
       try {
         if (shouldUseBulkApi) {
@@ -150,7 +165,7 @@ export class SalesforceService {
   async cleanupRecords(
     environmentId: string,
     salesforceIds: { objectType: string; id: string }[],
-  ): Promise<{ success: number; failed: number }> {
+  ): Promise<{ success: number; failed: number; successIds: string[]; failedIds: string[] }> {
     // Group by object type
     const idsByObject = new Map<string, string[]>();
     for (const { objectType, id } of salesforceIds) {
@@ -162,6 +177,8 @@ export class SalesforceService {
 
     let success = 0;
     let failed = 0;
+    const successIds: string[] = [];
+    const failedIds: string[] = [];
 
     // Delete in reverse order (children first)
     const cleanupOrder = this.objectMapper.getCleanupOrder();
@@ -178,31 +195,46 @@ export class SalesforceService {
         if (ids.length > 200) {
           // Use bulk API for large deletes
           const results = await this.bulkApiService.deleteRecords(environmentId, objectType, ids);
-          results.forEach((result) => {
+          results.forEach((result, index) => {
+            const recordId = result.id || ids[index];
             if (result.success) {
               success++;
+              if (recordId) {
+                successIds.push(recordId);
+              }
             } else {
               failed++;
+              if (recordId) {
+                failedIds.push(recordId);
+              }
             }
           });
         } else {
           // Use REST API for smaller deletes
           const results = await this.restApiService.deleteRecords(environmentId, objectType, ids);
-          results.forEach((result) => {
+          results.forEach((result, index) => {
+            const recordId = result.id || ids[index];
             if (result.success) {
               success++;
+              if (recordId) {
+                successIds.push(recordId);
+              }
             } else {
               failed++;
+              if (recordId) {
+                failedIds.push(recordId);
+              }
             }
           });
         }
       } catch (error: any) {
         this.logger.error(`Failed to delete ${objectType} records: ${error.message}`);
         failed += ids.length;
+        failedIds.push(...ids);
       }
     }
 
-    return { success, failed };
+    return { success, failed, successIds, failedIds };
   }
 
   async verifyRecords(

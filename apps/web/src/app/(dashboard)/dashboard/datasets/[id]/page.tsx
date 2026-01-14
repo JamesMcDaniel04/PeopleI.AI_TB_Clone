@@ -48,6 +48,12 @@ export default function DatasetDetailPage() {
     enabled: !!dataset && dataset.status !== 'pending' && dataset.status !== 'generating',
   });
 
+  const { data: jobs } = useQuery({
+    queryKey: ['jobs', datasetId],
+    queryFn: () => api.jobs.list({ datasetId, limit: 10 }).then((res) => res.data.data),
+    enabled: !!dataset,
+  });
+
   const injectMutation = useMutation({
     mutationFn: () => api.generator.inject(datasetId),
     onSuccess: () => {
@@ -332,8 +338,60 @@ export default function DatasetDetailPage() {
           </div>
         </div>
       )}
+
+      {jobs?.length > 0 && (
+        <div className="card">
+          <div className="px-6 py-4 border-b">
+            <h2 className="text-lg font-semibold text-gray-900">Job Activity</h2>
+          </div>
+          <div className="divide-y">
+            {jobs.map((job: any) => (
+              <div key={job.id} className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {formatJobType(job.type)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatDateTime(job.createdAt)}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(
+                      job.status
+                    )}`}
+                  >
+                    {job.status}
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary-600"
+                      style={{ width: `${job.progress || 0}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">{job.progress || 0}% complete</p>
+                </div>
+                {job.errorMessage && (
+                  <p className="mt-2 text-xs text-red-600">{job.errorMessage}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function formatJobType(type: string): string {
+  const map: Record<string, string> = {
+    data_generation: 'Data generation',
+    data_injection: 'Salesforce injection',
+    cleanup: 'Salesforce cleanup',
+  };
+  return map[type] || type;
 }
 
 function getRecordPreview(data: any): string {

@@ -90,7 +90,7 @@ import configuration from './config/configuration';
     GeneratorModule,
     DatasetsModule,
     SalesforceModule,
-    JobsModule,
+    JobsModule.register({ controllers: true, processors: false }),
     HealthModule,
   ],
   providers: [

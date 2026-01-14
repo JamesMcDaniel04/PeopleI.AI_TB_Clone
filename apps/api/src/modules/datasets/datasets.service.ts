@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Dataset, DatasetStatus } from './entities/dataset.entity';
 import { DatasetRecord, RecordStatus } from './entities/dataset-record.entity';
 
@@ -176,5 +176,17 @@ export class DatasetsService {
         objectType: r.salesforceObject,
         id: r.salesforceId!,
       }));
+  }
+
+  async resetInjectedRecords(datasetId: string, salesforceIds: string[]): Promise<void> {
+    const ids = salesforceIds;
+    if (ids.length === 0) {
+      return;
+    }
+
+    await this.recordsRepository.update(
+      { datasetId, salesforceId: In(ids) },
+      { salesforceId: null, status: RecordStatus.GENERATED, injectedAt: null },
+    );
   }
 }

@@ -6,6 +6,7 @@ import { GeneratorService } from '../../generator/generator.service';
 import { DatasetsService } from '../../datasets/datasets.service';
 import { DatasetStatus } from '../../datasets/entities/dataset.entity';
 import { GenerationJobData } from '../services/queue.service';
+import { JobsService } from '../jobs.service';
 
 @Processor('generation')
 export class GenerationProcessor extends WorkerHost {
@@ -16,6 +17,7 @@ export class GenerationProcessor extends WorkerHost {
     private generatorService: GeneratorService,
     private datasetsService: DatasetsService,
     private eventEmitter: EventEmitter2,
+    private jobsService: JobsService,
   ) {
     super();
   }
@@ -42,22 +44,28 @@ export class GenerationProcessor extends WorkerHost {
   }
 
   @OnWorkerEvent('active')
-  onActive(job: Job) {
+  async onActive(job: Job) {
     this.logger.log(`Processing generation job ${job.id}`);
+    await this.jobsService.markProcessing('generation', String(job.id), job.attemptsMade);
   }
 
   @OnWorkerEvent('completed')
-  onCompleted(job: Job) {
+  async onCompleted(job: Job) {
     this.logger.log(`Completed generation job ${job.id}`);
+    await this.jobsService.markCompleted('generation', String(job.id), {
+      datasetId: job.data?.datasetId,
+    });
   }
 
   @OnWorkerEvent('failed')
-  onFailed(job: Job, err: Error) {
+  async onFailed(job: Job, err: Error) {
     this.logger.error(`Failed generation job ${job.id}: ${err.message}`);
+    await this.jobsService.markFailed('generation', String(job.id), err.message);
   }
 
   @OnWorkerEvent('progress')
-  onProgress(job: Job, progress: number) {
+  async onProgress(job: Job, progress: number) {
     this.logger.debug(`Generation job ${job.id} progress: ${progress}%`);
+    await this.jobsService.updateProgress('generation', String(job.id), progress);
   }
 }

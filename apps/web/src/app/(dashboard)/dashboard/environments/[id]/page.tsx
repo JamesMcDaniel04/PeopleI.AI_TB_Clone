@@ -103,6 +103,7 @@ export default function EnvironmentDetailPage() {
   const statusData = statusQuery.data;
   const status = statusData?.status || environment.status;
   const isConnected = statusData?.isConnected ?? environment.status === 'connected';
+  const isConnecting = status === 'connecting';
 
   return (
     <div className="space-y-6">
@@ -151,15 +152,15 @@ export default function EnvironmentDetailPage() {
           ) : (
             <button
               onClick={() => connectMutation.mutate()}
-              disabled={connectMutation.isPending}
+              disabled={connectMutation.isPending || isConnecting}
               className="btn btn-primary btn-md"
             >
-              {connectMutation.isPending ? (
+              {connectMutation.isPending || isConnecting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <ExternalLink className="mr-2 h-4 w-4" />
               )}
-              Connect to Salesforce
+              {isConnecting ? 'Connecting...' : 'Connect to Salesforce'}
             </button>
           )}
         </div>

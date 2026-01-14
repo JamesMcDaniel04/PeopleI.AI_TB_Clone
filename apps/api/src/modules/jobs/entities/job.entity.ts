@@ -27,6 +27,7 @@ export enum JobStatus {
 @Entity('jobs')
 @Index(['status', 'scheduledFor'])
 @Index(['type', 'status'])
+@Index(['queueName', 'queueJobId'])
 export class Job {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -36,6 +37,12 @@ export class Job {
     enum: JobType,
   })
   type: JobType;
+
+  @Column({ name: 'queue_name', nullable: true })
+  queueName: string;
+
+  @Column({ name: 'queue_job_id', nullable: true })
+  queueJobId: string;
 
   @Column({
     type: 'enum',
@@ -75,6 +82,9 @@ export class Job {
 
   @Column({ default: 0 })
   priority: number;
+
+  @Column({ default: 0 })
+  progress: number;
 
   @Column({ name: 'scheduled_for', default: () => 'CURRENT_TIMESTAMP' })
   scheduledFor: Date;

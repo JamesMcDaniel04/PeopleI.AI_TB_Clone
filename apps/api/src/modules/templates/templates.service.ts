@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Template, Industry, TemplateCategory } from './entities/template.entity';
 import { TemplatePrompt } from './entities/template-prompt.entity';
+import { DEFAULT_TEMPLATE_PROMPTS } from './default-prompts';
 
 @Injectable()
 export class TemplatesService {
@@ -50,7 +51,11 @@ export class TemplatesService {
 
   async create(data: Partial<Template>): Promise<Template> {
     const template = this.templatesRepository.create(data);
-    return this.templatesRepository.save(template);
+    const saved = await this.templatesRepository.save(template);
+
+    await this.ensureDefaultPrompts(saved.id);
+
+    return this.findById(saved.id);
   }
 
   async update(id: string, data: Partial<Template>): Promise<Template> {
@@ -68,9 +73,7 @@ export class TemplatesService {
 
   async seedDefaultTemplates(): Promise<void> {
     const existingCount = await this.templatesRepository.count({ where: { isSystem: true } });
-    if (existingCount > 0) {
-      return; // Already seeded
-    }
+    const shouldSeedTemplates = existingCount === 0;
 
     const defaultTemplates: Partial<Template>[] = [
       {
@@ -159,8 +162,68 @@ export class TemplatesService {
       },
     ];
 
-    for (const templateData of defaultTemplates) {
-      await this.templatesRepository.save(this.templatesRepository.create(templateData));
+    if (shouldSeedTemplates) {
+      for (const templateData of defaultTemplates) {
+        await this.templatesRepository.save(this.templatesRepository.create(templateData));
+      }
+    }
+
+    const systemTemplates = await this.templatesRepository.find({
+      where: { isSystem: true },
+    });
+
+    for (const template of systemTemplates) {
+      await this.ensureDefaultPrompts(template.id);
+    }
+  }
+
+  async upsertPrompts(
+    templateId: string,
+    prompts: Partial<TemplatePrompt>[],
+  ): Promise<TemplatePrompt[]> {
+    const existing = await this.promptsRepository.find({ where: { templateId } });
+    const existingMap = new Map(
+      existing.map((prompt) => [prompt.salesforceObject, prompt]),
+    );
+
+    const toSave = prompts.map((prompt) => {
+      const normalized = {
+        ...prompt,
+        temperature: prompt.temperature ?? 0.7,
+      };
+      const current = existingMap.get(prompt.salesforceObject!);
+      if (current) {
+        Object.assign(current, normalized);
+        return current;
+      }
+
+      return this.promptsRepository.create({
+        ...normalized,
+        templateId,
+      });
+    });
+
+    await this.promptsRepository.save(toSave);
+    return this.promptsRepository.find({ where: { templateId } });
+  }
+
+  private async ensureDefaultPrompts(templateId: string): Promise<void> {
+    const existingPrompts = await this.promptsRepository.find({
+      where: { templateId },
+    });
+
+    const existingTypes = new Set(existingPrompts.map((prompt) => prompt.salesforceObject));
+    const missingPrompts = DEFAULT_TEMPLATE_PROMPTS.filter(
+      (prompt) => !existingTypes.has(prompt.salesforceObject),
+    ).map((prompt) =>
+      this.promptsRepository.create({
+        ...prompt,
+        templateId,
+      }),
+    );
+
+    if (missingPrompts.length > 0) {
+      await this.promptsRepository.save(missingPrompts);
     }
   }
 }

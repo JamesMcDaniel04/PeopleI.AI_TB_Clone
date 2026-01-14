@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Template, Industry } from '../../templates/entities/template.entity';
 import { GenerationPrompt } from './openai.service';
+import { SalesforceObject } from '../../templates/entities/template-prompt.entity';
+import { getDefaultTemplatePrompt } from '../../templates/default-prompts';
 
 interface GenerationConfig {
   recordCounts?: Record<string, number>;
@@ -20,19 +22,38 @@ export class PromptBuilderService {
     const industry = config.industry || template.industry || Industry.GENERAL;
     const scenario = config.scenario || 'Standard sales scenario';
 
-    const systemPrompt = this.getSystemPrompt(objectType, industry);
-    const userPrompt = this.getUserPrompt(
-      objectType,
-      count,
-      existingRecords,
-      industry,
-      scenario,
+    const promptDefinition =
+      template.prompts?.find((prompt) => prompt.salesforceObject === objectType) ||
+      getDefaultTemplatePrompt(objectType as SalesforceObject);
+
+    const systemPrompt = this.interpolatePrompt(
+      promptDefinition?.systemPrompt || this.getSystemPrompt(objectType, industry),
+      {
+        industry,
+        objectType,
+        count,
+        scenario,
+        context: '',
+      },
+    );
+
+    const context = this.buildContext(objectType, existingRecords);
+    const userPrompt = this.interpolatePrompt(
+      promptDefinition?.userPromptTemplate ||
+        this.getUserPrompt(objectType, count, existingRecords, industry, scenario),
+      {
+        industry,
+        objectType,
+        count,
+        scenario,
+        context,
+      },
     );
 
     return {
       systemPrompt,
       userPrompt,
-      temperature: 0.7,
+      temperature: promptDefinition?.temperature ?? 0.7,
     };
   }
 
@@ -117,6 +138,57 @@ Create realistic meeting scenarios (discovery calls, demos, contract reviews).`,
     };
 
     return basePrompt + (objectSpecificPrompts[objectType] || `Generate ${objectType} records.`);
+  }
+
+  private interpolatePrompt(
+    template: string,
+    variables: Record<string, string | number>,
+  ): string {
+    return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key) => {
+      const value = variables[key];
+      return value !== undefined ? String(value) : '';
+    });
+  }
+
+  private buildContext(objectType: string, existingRecords: Map<string, any[]>): string {
+    // Add context from existing records
+    if (objectType === 'Contact' && existingRecords.has('Account')) {
+      const accounts = existingRecords.get('Account')!;
+      return `These contacts should be distributed across these accounts (use their _localId for _parentLocalId):
+${JSON.stringify(accounts.map((a) => ({ _localId: a._localId, Name: a.Name })), null, 2)}
+
+Generate 2-4 contacts per account with varied roles.
+
+`;
+    }
+
+    if (objectType === 'Opportunity' && existingRecords.has('Account')) {
+      const accounts = existingRecords.get('Account')!;
+      return `These opportunities should be linked to these accounts (use their _localId for _parentLocalId):
+${JSON.stringify(accounts.map((a) => ({ _localId: a._localId, Name: a.Name })), null, 2)}
+
+Create 1-2 opportunities per account with varied stages.
+
+`;
+    }
+
+    if ((objectType === 'Task' || objectType === 'Event') && existingRecords.has('Contact')) {
+      const contacts = existingRecords.get('Contact')!;
+      const opportunities = existingRecords.get('Opportunity') || [];
+
+      return `Link these activities to contacts (WhoId_localId) and optionally opportunities (WhatId_localId):
+
+Contacts:
+${JSON.stringify(contacts.map((c) => ({ _localId: c._localId, Name: `${c.FirstName} ${c.LastName}` })), null, 2)}
+
+${opportunities.length > 0 ? `Opportunities:\n${JSON.stringify(opportunities.map((o) => ({ _localId: o._localId, Name: o.Name })), null, 2)}` : ''}
+
+Distribute activities across contacts realistically.
+
+`;
+    }
+
+    return '';
   }
 
   private getUserPrompt(
