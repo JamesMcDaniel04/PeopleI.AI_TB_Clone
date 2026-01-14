@@ -22,7 +22,7 @@ export class InjectionProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<InjectionJobData>): Promise<void> {
+  async process(job: Job<InjectionJobData>): Promise<{ successful: number; failed: number; total: number }> {
     const { datasetId, environmentId } = job.data;
     this.logger.log(`Starting injection job ${job.id} for dataset ${datasetId}`);
 
@@ -99,6 +99,7 @@ export class InjectionProcessor extends WorkerHost {
       this.logger.log(
         `Injection completed for dataset ${datasetId}: ${result.summary.successful} success, ${result.summary.failed} failed`,
       );
+      return result.summary;
     } catch (error: any) {
       this.logger.error(`Injection failed for dataset ${datasetId}: ${error.message}`);
       await this.datasetsService.updateStatus(datasetId, DatasetStatus.FAILED, error.message);
@@ -117,6 +118,7 @@ export class InjectionProcessor extends WorkerHost {
     this.logger.log(`Completed injection job ${job.id}`);
     await this.jobsService.markCompleted('injection', String(job.id), {
       datasetId: job.data?.datasetId,
+      result: job.returnvalue,
     });
   }
 

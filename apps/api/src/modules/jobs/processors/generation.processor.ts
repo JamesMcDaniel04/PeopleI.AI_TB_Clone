@@ -22,7 +22,7 @@ export class GenerationProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<GenerationJobData>): Promise<void> {
+  async process(job: Job<GenerationJobData>): Promise<{ datasetId: string }> {
     const { datasetId } = job.data;
     this.logger.log(`Starting generation job ${job.id} for dataset ${datasetId}`);
 
@@ -36,6 +36,7 @@ export class GenerationProcessor extends WorkerHost {
 
       this.eventEmitter.emit('generation.completed', { datasetId, jobId: job.id });
       this.logger.log(`Generation completed for dataset ${datasetId}`);
+      return { datasetId };
     } catch (error: any) {
       this.logger.error(`Generation failed for dataset ${datasetId}: ${error.message}`);
       await this.datasetsService.updateStatus(datasetId, DatasetStatus.FAILED, error.message);
@@ -54,6 +55,7 @@ export class GenerationProcessor extends WorkerHost {
     this.logger.log(`Completed generation job ${job.id}`);
     await this.jobsService.markCompleted('generation', String(job.id), {
       datasetId: job.data?.datasetId,
+      result: job.returnvalue,
     });
   }
 

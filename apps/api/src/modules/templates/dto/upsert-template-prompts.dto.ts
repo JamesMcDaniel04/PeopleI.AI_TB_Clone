@@ -32,6 +32,7 @@ export class TemplatePromptInputDto {
   @ApiPropertyOptional({ description: 'Temperature for generation', default: 0.7 })
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   temperature?: number;
 }
 

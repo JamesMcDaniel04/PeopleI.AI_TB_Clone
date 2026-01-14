@@ -20,7 +20,7 @@ export class CleanupProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<CleanupJobData>): Promise<void> {
+  async process(job: Job<CleanupJobData>): Promise<{ success: number; failed: number; successIds: string[]; failedIds: string[] }> {
     const { datasetId, environmentId } = job.data;
     this.logger.log(`Starting cleanup job ${job.id} for dataset ${datasetId}`);
 
@@ -35,7 +35,7 @@ export class CleanupProcessor extends WorkerHost {
           jobId: job.id,
           result: { deleted: 0, failed: 0 },
         });
-        return;
+        return { success: 0, failed: 0, successIds: [], failedIds: [] };
       }
 
       await job.updateProgress(10);
@@ -62,6 +62,7 @@ export class CleanupProcessor extends WorkerHost {
       this.logger.log(
         `Cleanup completed for dataset ${datasetId}: ${result.success} success, ${result.failed} failed`,
       );
+      return result;
     } catch (error: any) {
       this.logger.error(`Cleanup failed for dataset ${datasetId}: ${error.message}`);
       throw error;
@@ -79,6 +80,7 @@ export class CleanupProcessor extends WorkerHost {
     this.logger.log(`Completed cleanup job ${job.id}`);
     await this.jobsService.markCompleted('cleanup', String(job.id), {
       datasetId: job.data?.datasetId,
+      result: job.returnvalue,
     });
   }
 

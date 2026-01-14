@@ -50,10 +50,14 @@ export class PromptBuilderService {
       },
     );
 
+    const rawTemperature = promptDefinition?.temperature;
+    const parsedTemperature =
+      typeof rawTemperature === 'string' ? parseFloat(rawTemperature) : rawTemperature;
+
     return {
       systemPrompt,
       userPrompt,
-      temperature: promptDefinition?.temperature ?? 0.7,
+      temperature: Number.isFinite(parsedTemperature as number) ? (parsedTemperature as number) : 0.7,
     };
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -12,12 +12,9 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Cloud,
   Trash2,
-  Download,
   Play,
   RefreshCw,
-  ExternalLink,
 } from 'lucide-react';
 
 export default function DatasetDetailPage() {
@@ -28,7 +25,7 @@ export default function DatasetDetailPage() {
 
   const [selectedObject, setSelectedObject] = useState<string | null>(null);
 
-  const { data: dataset, isLoading, refetch } = useQuery({
+  const { data: dataset, isLoading } = useQuery({
     queryKey: ['dataset', datasetId],
     queryFn: () => api.datasets.get(datasetId).then((res) => res.data.data),
     refetchInterval: (data) => {
@@ -58,6 +55,7 @@ export default function DatasetDetailPage() {
     mutationFn: () => api.generator.inject(datasetId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs', datasetId] });
     },
   });
 
@@ -72,6 +70,7 @@ export default function DatasetDetailPage() {
     mutationFn: () => api.datasets.cleanup(datasetId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs', datasetId] });
     },
   });
 

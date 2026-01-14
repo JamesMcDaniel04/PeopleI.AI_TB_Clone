@@ -72,11 +72,14 @@ export default function TemplateDetailPage() {
 
     const promptState = OBJECT_TYPES.map((objectType) => {
       const existing = promptMap.get(objectType);
+      const temperatureValue =
+        existing?.temperature !== undefined ? Number(existing.temperature) : 0.7;
+
       return {
         salesforceObject: objectType,
         systemPrompt: existing?.systemPrompt || '',
         userPromptTemplate: existing?.userPromptTemplate || '',
-        temperature: existing?.temperature ?? 0.7,
+        temperature: Number.isNaN(temperatureValue) ? 0.7 : temperatureValue,
       };
     });
 
