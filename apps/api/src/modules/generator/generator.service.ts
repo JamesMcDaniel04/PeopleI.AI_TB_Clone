@@ -160,6 +160,17 @@ export class GeneratorService {
         r.localId === opportunity.data._parentLocalId,
     );
 
+    const accountName = account?.data?.Name || 'Acme';
+    const accountSlug = accountName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'acme';
+    const contactEmail =
+      contact.data.Email ||
+      `${(contact.data.FirstName || 'demo').toLowerCase()}.${(contact.data.LastName || 'user')
+        .toLowerCase()}@${accountSlug}-demo.com`;
+    const salesRepEmail = `sales@${accountSlug}-demo.com`;
+
     const prompt = this.promptBuilder.buildEmailPrompt(
       {
         account: account?.data || { Name: 'Unknown Company', Industry: 'Technology' },
@@ -171,17 +182,24 @@ export class GeneratorService {
 
     const result = await this.openaiService.generateStructuredData(prompt);
 
-    // Transform and save email records as Tasks
+    // Transform and save email records
+    const emails = Array.isArray(result.emails) ? result.emails : [];
     const emailRecords = this.dataTransformer.generateEmailRecords(
-      result.emails,
-      contact.localId,
+      emails,
+      contactEmail,
+      salesRepEmail,
       opportunityLocalId,
     );
+
+    if (emailRecords.length === 0) {
+      this.logger.warn(`No email records generated for opportunity ${opportunityLocalId}`);
+      return;
+    }
 
     for (const emailRecord of emailRecords) {
       await this.datasetsService.createRecord({
         datasetId,
-        salesforceObject: 'Task',
+        salesforceObject: 'EmailMessage',
         localId: emailRecord._localId,
         data: emailRecord,
       });

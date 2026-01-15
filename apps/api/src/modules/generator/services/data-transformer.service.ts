@@ -46,6 +46,8 @@ export class DataTransformerService {
         return this.transformTask(data);
       case 'Event':
         return this.transformEvent(data);
+      case 'EmailMessage':
+        return this.transformEmailMessage(data);
       default:
         return data;
     }
@@ -121,6 +123,18 @@ export class DataTransformerService {
       Type: record.Type,
       WhoId_localId: record.WhoId_localId,
       WhatId_localId: record.WhatId_localId,
+    };
+  }
+
+  private transformEmailMessage(record: Record<string, any>): Record<string, any> {
+    return {
+      Subject: record.Subject,
+      TextBody: record.TextBody || record.Body || record.Description,
+      FromAddress: this.sanitizeEmail(record.FromAddress),
+      ToAddress: this.sanitizeEmail(record.ToAddress),
+      MessageDate: this.formatDateTime(record.MessageDate),
+      Incoming: this.parseBoolean(record.Incoming),
+      RelatedToId_localId: record.RelatedToId_localId,
     };
   }
 
@@ -269,27 +283,57 @@ export class DataTransformerService {
     return status;
   }
 
+  private parseBoolean(value: any): boolean | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'y'].includes(normalized)) {
+        return true;
+      }
+      if (['false', '0', 'no', 'n'].includes(normalized)) {
+        return false;
+      }
+    }
+    return null;
+  }
+
   /**
    * Generate email records from email thread data
    */
   generateEmailRecords(
     emails: { subject: string; body: string; direction: string; timestamp?: string }[],
-    contactLocalId: string,
+    contactEmail: string,
+    salesRepEmail: string,
     opportunityLocalId: string,
   ): Record<string, any>[] {
-    return emails.map((email, index) => ({
-      _localId: `Email_${Date.now()}_${index}`,
-      Subject: email.subject,
-      Description: email.body,
-      Status: 'Completed',
-      Priority: 'Normal',
-      ActivityDate: this.formatDate(email.timestamp || new Date().toISOString()),
-      Type: 'Email',
-      WhoId_localId: contactLocalId,
-      WhatId_localId: opportunityLocalId,
-      // Custom field to track direction
-      _direction: email.direction,
-    }));
+    const sanitizedContactEmail = this.sanitizeEmail(contactEmail);
+    const sanitizedRepEmail = this.sanitizeEmail(salesRepEmail);
+
+    return emails.map((email, index) => {
+      const direction = (email.direction || '').toLowerCase();
+      const isInbound = direction === 'inbound';
+      const subject = email.subject || `Follow up ${index + 1}`;
+      const body = email.body || 'Email content not provided.';
+
+      return {
+        _localId: `EmailMessage_${Date.now()}_${index}`,
+        Subject: subject,
+        TextBody: body,
+        FromAddress: isInbound ? sanitizedContactEmail : sanitizedRepEmail,
+        ToAddress: isInbound ? sanitizedRepEmail : sanitizedContactEmail,
+        MessageDate: this.formatDateTime(email.timestamp || new Date().toISOString()),
+        Incoming: isInbound,
+        RelatedToId_localId: opportunityLocalId,
+      };
+    });
   }
 
   /**

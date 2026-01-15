@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -15,6 +15,8 @@ import {
   Trash2,
   Play,
   RefreshCw,
+  Mail,
+  PhoneCall,
 } from 'lucide-react';
 
 export default function DatasetDetailPage() {
@@ -24,6 +26,12 @@ export default function DatasetDetailPage() {
   const datasetId = params.id as string;
 
   const [selectedObject, setSelectedObject] = useState<string | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<string>('');
+  const [emailCount, setEmailCount] = useState(3);
+  const [callType, setCallType] = useState('Discovery Call');
+  const [callDuration, setCallDuration] = useState(30);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [callError, setCallError] = useState<string | null>(null);
 
   const { data: dataset, isLoading } = useQuery({
     queryKey: ['dataset', datasetId],
@@ -42,6 +50,12 @@ export default function DatasetDetailPage() {
     queryKey: ['dataset-records', datasetId, selectedObject],
     queryFn: () =>
       api.datasets.getRecords(datasetId, selectedObject || undefined).then((res) => res.data.data),
+    enabled: !!dataset && dataset.status !== 'pending' && dataset.status !== 'generating',
+  });
+
+  const { data: opportunities, isLoading: opportunitiesLoading } = useQuery({
+    queryKey: ['dataset-records', datasetId, 'Opportunity'],
+    queryFn: () => api.datasets.getRecords(datasetId, 'Opportunity').then((res) => res.data.data),
     enabled: !!dataset && dataset.status !== 'pending' && dataset.status !== 'generating',
   });
 
@@ -73,6 +87,37 @@ export default function DatasetDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['jobs', datasetId] });
     },
   });
+
+  const emailMutation = useMutation({
+    mutationFn: () => api.generator.generateEmails(datasetId, selectedOpportunity, emailCount),
+    onSuccess: () => {
+      setEmailError(null);
+      queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['dataset-records', datasetId] });
+    },
+    onError: (error: any) => {
+      setEmailError(error.response?.data?.message || 'Failed to generate email thread.');
+    },
+  });
+
+  const callMutation = useMutation({
+    mutationFn: () =>
+      api.generator.generateCall(datasetId, selectedOpportunity, callType, callDuration),
+    onSuccess: () => {
+      setCallError(null);
+      queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['dataset-records', datasetId] });
+    },
+    onError: (error: any) => {
+      setCallError(error.response?.data?.message || 'Failed to generate call transcript.');
+    },
+  });
+
+  useEffect(() => {
+    if (!selectedOpportunity && opportunities?.length) {
+      setSelectedOpportunity(opportunities[0].localId);
+    }
+  }, [opportunities, selectedOpportunity]);
 
   if (isLoading) {
     return (
@@ -232,6 +277,118 @@ export default function DatasetDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <div className="flex items-center">
+            <Mail className="h-5 w-5 text-primary-600 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Opportunity Enrichment</h2>
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          {opportunitiesLoading ? (
+            <div className="flex items-center text-sm text-gray-500">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading opportunities...
+            </div>
+          ) : !opportunities || opportunities.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Generate opportunities first to create email threads or call transcripts.
+            </p>
+          ) : (
+            <>
+              <div>
+                <label className="label">Opportunity</label>
+                <select
+                  value={selectedOpportunity}
+                  onChange={(event) => setSelectedOpportunity(event.target.value)}
+                  className="input mt-1"
+                >
+                  {opportunities.map((opp: any) => (
+                    <option key={opp.localId} value={opp.localId}>
+                      {opp.data?.Name || opp.localId}
+                      {opp.data?.StageName ? ` • ${opp.data.StageName}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center text-sm font-medium text-gray-700">
+                    <Mail className="h-4 w-4 mr-2 text-primary-600" />
+                    Email Thread
+                  </div>
+                  <div>
+                    <label className="label">Email Count</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={emailCount}
+                      onChange={(event) => setEmailCount(Number(event.target.value) || 1)}
+                      className="input mt-1 w-28"
+                    />
+                  </div>
+                  {emailError && <p className="text-xs text-red-600">{emailError}</p>}
+                  <button
+                    onClick={() => emailMutation.mutate()}
+                    disabled={!selectedOpportunity || emailMutation.isPending}
+                    className="btn btn-primary btn-md w-full"
+                  >
+                    {emailMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Mail className="mr-2 h-4 w-4" />
+                    )}
+                    Generate Emails
+                  </button>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center text-sm font-medium text-gray-700">
+                    <PhoneCall className="h-4 w-4 mr-2 text-primary-600" />
+                    Call Transcript
+                  </div>
+                  <div>
+                    <label className="label">Call Type</label>
+                    <input
+                      type="text"
+                      value={callType}
+                      onChange={(event) => setCallType(event.target.value)}
+                      className="input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Duration (minutes)</label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="120"
+                      value={callDuration}
+                      onChange={(event) => setCallDuration(Number(event.target.value) || 5)}
+                      className="input mt-1 w-28"
+                    />
+                  </div>
+                  {callError && <p className="text-xs text-red-600">{callError}</p>}
+                  <button
+                    onClick={() => callMutation.mutate()}
+                    disabled={!selectedOpportunity || callMutation.isPending}
+                    className="btn btn-outline btn-md w-full"
+                  >
+                    {callMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <PhoneCall className="mr-2 h-4 w-4" />
+                    )}
+                    Generate Call
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -397,6 +554,8 @@ function getRecordPreview(data: any): string {
   if (data.Name) return data.Name;
   if (data.FirstName && data.LastName) return `${data.FirstName} ${data.LastName}`;
   if (data.Subject) return data.Subject;
+  if (data.TextBody) return String(data.TextBody).slice(0, 50);
+  if (data.FromAddress) return data.FromAddress;
   if (data.Email) return data.Email;
   return JSON.stringify(data).slice(0, 50) + '...';
 }

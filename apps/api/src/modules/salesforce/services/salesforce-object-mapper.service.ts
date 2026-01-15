@@ -204,6 +204,17 @@ export class SalesforceObjectMapperService {
             errors.push('Missing Opportunity reference');
           }
           break;
+        case 'EmailMessage':
+          if (!data.Subject) {
+            errors.push('Missing EmailMessage Subject');
+          }
+          if (!data.TextBody) {
+            errors.push('Missing EmailMessage TextBody');
+          }
+          if (data.RelatedToId_localId && !idMap.has(data.RelatedToId_localId)) {
+            errors.push('Missing Opportunity reference');
+          }
+          break;
         default:
           break;
       }
