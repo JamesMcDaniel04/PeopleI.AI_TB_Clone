@@ -8,6 +8,7 @@ import { DatasetStatus } from '../../datasets/entities/dataset.entity';
 import { RecordStatus } from '../../datasets/entities/dataset-record.entity';
 import { InjectionJobData } from '../services/queue.service';
 import { JobsService } from '../jobs.service';
+import { JobStatus } from '../entities/job.entity';
 
 @Processor('injection')
 export class InjectionProcessor extends WorkerHost {
@@ -28,6 +29,13 @@ export class InjectionProcessor extends WorkerHost {
 
     try {
       await job.updateProgress(0);
+      const queueJobId = String(job.id);
+      const ensureNotCancelled = async () => {
+        const current = await this.jobsService.findByQueue('injection', queueJobId);
+        if (current?.status === JobStatus.CANCELLED) {
+          throw new Error('Job cancelled');
+        }
+      };
 
       // Update dataset status
       await this.datasetsService.updateStatus(datasetId, DatasetStatus.INJECTING);
@@ -35,9 +43,11 @@ export class InjectionProcessor extends WorkerHost {
       // Get all generated records
       const records = await this.datasetsService.getRecords(datasetId);
 
-      await job.updateProgress(10);
+      const totalRecords = records.length;
 
       // Inject records into Salesforce
+      await ensureNotCancelled();
+
       const result = await this.salesforceService.injectRecords(
         environmentId,
         records.map((r) => ({
@@ -47,9 +57,17 @@ export class InjectionProcessor extends WorkerHost {
           parentLocalId: r.parentLocalId || undefined,
           data: r.data,
         })),
+        {
+          onProgress: async (processed, total) => {
+            await ensureNotCancelled();
+            if (total === 0) {
+              return;
+            }
+            const progress = Math.min(95, Math.floor((processed / total) * 100));
+            await job.updateProgress(progress);
+          },
+        },
       );
-
-      await job.updateProgress(80);
 
       // Update individual record statuses
       for (const success of result.success) {
@@ -69,7 +87,9 @@ export class InjectionProcessor extends WorkerHost {
         );
       }
 
-      await job.updateProgress(90);
+      if (totalRecords === 0) {
+        await job.updateProgress(95);
+      }
 
       // Update dataset status
       if (result.summary.failed === 0) {

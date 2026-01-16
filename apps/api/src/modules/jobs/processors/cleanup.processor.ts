@@ -6,6 +6,7 @@ import { SalesforceService } from '../../salesforce/salesforce.service';
 import { DatasetsService } from '../../datasets/datasets.service';
 import { CleanupJobData } from '../services/queue.service';
 import { JobsService } from '../jobs.service';
+import { JobStatus } from '../entities/job.entity';
 
 @Processor('cleanup')
 export class CleanupProcessor extends WorkerHost {
@@ -26,6 +27,13 @@ export class CleanupProcessor extends WorkerHost {
 
     try {
       await job.updateProgress(0);
+      const queueJobId = String(job.id);
+      const ensureNotCancelled = async () => {
+        const current = await this.jobsService.findByQueue('cleanup', queueJobId);
+        if (current?.status === JobStatus.CANCELLED) {
+          throw new Error('Job cancelled');
+        }
+      };
 
       const injectedRecords = await this.datasetsService.getInjectedRecords(datasetId);
       if (injectedRecords.length === 0) {
@@ -40,12 +48,22 @@ export class CleanupProcessor extends WorkerHost {
 
       await job.updateProgress(10);
 
+      await ensureNotCancelled();
+
       const result = await this.salesforceService.cleanupRecords(
         environmentId,
         injectedRecords,
+        async (processed, total) => {
+          await ensureNotCancelled();
+          if (total === 0) {
+            return;
+          }
+          const progress = Math.min(95, Math.floor((processed / total) * 100));
+          await job.updateProgress(progress);
+        },
       );
 
-      await job.updateProgress(90);
+      await job.updateProgress(95);
 
       if (result.successIds.length > 0) {
         await this.datasetsService.resetInjectedRecords(datasetId, result.successIds);

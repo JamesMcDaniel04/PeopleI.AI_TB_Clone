@@ -24,6 +24,7 @@ interface InjectionResult {
 interface InjectionOptions {
   useBulkApi?: boolean;
   bulkThreshold?: number;
+  onProgress?: (processed: number, total: number) => Promise<void> | void;
 }
 
 @Injectable()
@@ -41,7 +42,7 @@ export class SalesforceService {
     records: DatasetRecord[],
     options: InjectionOptions = {},
   ): Promise<InjectionResult> {
-    const { useBulkApi = true, bulkThreshold = 200 } = options;
+    const { useBulkApi = true, bulkThreshold = 200, onProgress } = options;
 
     // Group records by object type
     const recordsByObject = this.objectMapper.groupRecordsByObject(records);
@@ -56,6 +57,9 @@ export class SalesforceService {
       summary: { total: records.length, successful: 0, failed: 0 },
     };
     const idMap = new Map<string, string>();
+
+    const totalRecords = records.length;
+    let processed = 0;
 
     // Inject in order
     for (const objectType of injectionOrder) {
@@ -153,6 +157,11 @@ export class SalesforceService {
           result.summary.failed++;
         });
       }
+
+      processed += objectRecords.length;
+      if (onProgress) {
+        await onProgress(processed, totalRecords);
+      }
     }
 
     this.logger.log(
@@ -165,6 +174,7 @@ export class SalesforceService {
   async cleanupRecords(
     environmentId: string,
     salesforceIds: { objectType: string; id: string }[],
+    onProgress?: (processed: number, total: number) => Promise<void> | void,
   ): Promise<{ success: number; failed: number; successIds: string[]; failedIds: string[] }> {
     // Group by object type
     const idsByObject = new Map<string, string[]>();
@@ -179,6 +189,9 @@ export class SalesforceService {
     let failed = 0;
     const successIds: string[] = [];
     const failedIds: string[] = [];
+
+    const totalIds = salesforceIds.length;
+    let processed = 0;
 
     // Delete in reverse order (children first)
     const cleanupOrder = this.objectMapper.getCleanupOrder();
@@ -231,6 +244,11 @@ export class SalesforceService {
         this.logger.error(`Failed to delete ${objectType} records: ${error.message}`);
         failed += ids.length;
         failedIds.push(...ids);
+      }
+
+      processed += ids.length;
+      if (onProgress) {
+        await onProgress(processed, totalIds);
       }
     }
 

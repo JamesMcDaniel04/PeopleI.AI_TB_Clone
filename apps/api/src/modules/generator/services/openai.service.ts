@@ -1,11 +1,13 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import Ajv, { ValidateFunction } from 'ajv';
 
 export interface GenerationPrompt {
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;
+  outputSchema?: Record<string, any>;
 }
 
 @Injectable()
@@ -14,6 +16,8 @@ export class OpenAIService {
   private client: OpenAI;
   private model: string;
   private maxTokens: number;
+  private ajv: Ajv;
+  private schemaCache = new Map<string, ValidateFunction>();
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('openai.apiKey');
@@ -24,36 +28,74 @@ export class OpenAIService {
     this.client = new OpenAI({ apiKey });
     this.model = this.configService.get<string>('openai.model') || 'gpt-4-turbo-preview';
     this.maxTokens = this.configService.get<number>('openai.maxTokens') || 4000;
+    this.ajv = new Ajv({ allErrors: true, strict: false });
   }
 
-  async generateStructuredData(prompt: GenerationPrompt): Promise<any> {
+  async generateStructuredData(
+    prompt: GenerationPrompt,
+    options?: {
+      schema?: Record<string, any>;
+      maxRetries?: number;
+      schemaName?: string;
+    },
+  ): Promise<any> {
+    const schema = options?.schema || prompt.outputSchema;
+    const maxRetries = options?.maxRetries ?? 1;
+    const schemaName = options?.schemaName || 'output schema';
+    const baseUserPrompt = prompt.userPrompt;
+
     try {
       this.logger.debug(`Generating data with model: ${this.model}`);
 
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: 'system', content: prompt.systemPrompt },
-          { role: 'user', content: prompt.userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: prompt.temperature ?? 0.7,
-        max_tokens: this.maxTokens,
-      });
+      let lastError: string | null = null;
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        throw new BadRequestException('No content in OpenAI response');
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const userPrompt =
+          attempt === 0 || !schema
+            ? baseUserPrompt
+            : this.buildSchemaRepairPrompt(baseUserPrompt, schema, schemaName, lastError || '');
+
+        const response = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: 'system', content: prompt.systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: prompt.temperature ?? 0.7,
+          max_tokens: this.maxTokens,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
+          lastError = 'No content in OpenAI response';
+          continue;
+        }
+
+        this.logger.debug(`Generated response: ${content.substring(0, 200)}...`);
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(content);
+        } catch (parseError) {
+          this.logger.error(`Failed to parse OpenAI response as JSON: ${content}`);
+          lastError = 'Invalid JSON response from OpenAI';
+          continue;
+        }
+
+        if (schema) {
+          const validation = this.validateAgainstSchema(schema, parsed);
+          if (!validation.valid) {
+            lastError = `Schema validation failed: ${validation.errors?.join(', ') || 'unknown error'}`;
+            this.logger.warn(lastError);
+            continue;
+          }
+        }
+
+        return parsed;
       }
 
-      this.logger.debug(`Generated response: ${content.substring(0, 200)}...`);
-
-      try {
-        return JSON.parse(content);
-      } catch (parseError) {
-        this.logger.error(`Failed to parse OpenAI response as JSON: ${content}`);
-        throw new BadRequestException('Invalid JSON response from OpenAI');
-      }
+      throw new BadRequestException(lastError || 'Invalid JSON response from OpenAI');
     } catch (error: any) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -171,5 +213,44 @@ Return as JSON:
       userPrompt,
       temperature: 0.8,
     });
+  }
+
+  private validateAgainstSchema(schema: Record<string, any>, data: any): {
+    valid: boolean;
+    errors?: string[];
+  } {
+    const key = JSON.stringify(schema);
+    let validator = this.schemaCache.get(key);
+    if (!validator) {
+      validator = this.ajv.compile(schema);
+      this.schemaCache.set(key, validator);
+    }
+
+    const valid = validator(data);
+    if (valid) {
+      return { valid: true };
+    }
+
+    const errors = (validator.errors || []).map((err) => {
+      const path = err.instancePath || err.schemaPath || 'root';
+      return `${path} ${err.message || 'is invalid'}`.trim();
+    });
+    return { valid: false, errors };
+  }
+
+  private buildSchemaRepairPrompt(
+    baseUserPrompt: string,
+    schema: Record<string, any>,
+    schemaName: string,
+    errorDetails: string,
+  ): string {
+    const schemaString = JSON.stringify(schema, null, 2);
+    return `${baseUserPrompt}
+
+The previous response did not match the ${schemaName}.
+Validation errors: ${errorDetails || 'unknown schema error'}
+
+Return ONLY valid JSON that matches this JSON Schema:
+${schemaString}`;
   }
 }

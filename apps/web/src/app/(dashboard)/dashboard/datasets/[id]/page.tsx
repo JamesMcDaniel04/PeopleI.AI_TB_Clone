@@ -88,6 +88,22 @@ export default function DatasetDetailPage() {
     },
   });
 
+  const cancelJobMutation = useMutation({
+    mutationFn: (jobId: string) => api.jobs.cancel(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+    },
+  });
+
+  const retryJobMutation = useMutation({
+    mutationFn: (jobId: string) => api.jobs.retry(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+    },
+  });
+
   const emailMutation = useMutation({
     mutationFn: () => api.generator.generateEmails(datasetId, selectedOpportunity, emailCount),
     onSuccess: () => {
@@ -512,13 +528,53 @@ export default function DatasetDetailPage() {
                       {formatDateTime(job.createdAt)}
                     </p>
                   </div>
-                  <span
-                    className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(
-                      job.status
-                    )}`}
-                  >
-                    {job.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {(job.status === 'pending' || job.status === 'processing') && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Cancel this job?')) {
+                            cancelJobMutation.mutate(job.id);
+                          }
+                        }}
+                        disabled={
+                          cancelJobMutation.isPending &&
+                          cancelJobMutation.variables === job.id
+                        }
+                        className="btn btn-outline btn-sm"
+                      >
+                        {cancelJobMutation.isPending &&
+                        cancelJobMutation.variables === job.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          'Cancel'
+                        )}
+                      </button>
+                    )}
+                    {(job.status === 'failed' || job.status === 'cancelled') && (
+                      <button
+                        onClick={() => retryJobMutation.mutate(job.id)}
+                        disabled={
+                          retryJobMutation.isPending &&
+                          retryJobMutation.variables === job.id
+                        }
+                        className="btn btn-primary btn-sm"
+                      >
+                        {retryJobMutation.isPending &&
+                        retryJobMutation.variables === job.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          'Retry'
+                        )}
+                      </button>
+                    )}
+                    <span
+                      className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(
+                        job.status
+                      )}`}
+                    >
+                      {job.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-3">
                   <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">

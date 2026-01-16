@@ -170,5 +170,7 @@ export const api = {
     list: (params?: { datasetId?: string; type?: string; status?: string; limit?: number }) =>
       apiClient.get('/jobs', { params }),
     get: (id: string) => apiClient.get(`/jobs/${id}`),
+    cancel: (id: string) => apiClient.post(`/jobs/${id}/cancel`),
+    retry: (id: string) => apiClient.post(`/jobs/${id}/retry`),
   },
 };

@@ -35,14 +35,18 @@ export class JobsService {
   }
 
   async markProcessing(queueName: string, queueJobId: string, attempts?: number): Promise<void> {
-    await this.jobsRepository.update(
-      { queueName, queueJobId },
-      {
+    await this.jobsRepository
+      .createQueryBuilder()
+      .update(Job)
+      .set({
         status: JobStatus.PROCESSING,
         attempts: attempts ?? 0,
         startedAt: new Date(),
-      },
-    );
+      })
+      .where('queue_name = :queueName', { queueName })
+      .andWhere('queue_job_id = :queueJobId', { queueJobId })
+      .andWhere('status != :cancelled', { cancelled: JobStatus.CANCELLED })
+      .execute();
   }
 
   async markCompleted(
@@ -50,15 +54,19 @@ export class JobsService {
     queueJobId: string,
     result?: Record<string, any>,
   ): Promise<void> {
-    await this.jobsRepository.update(
-      { queueName, queueJobId },
-      {
+    await this.jobsRepository
+      .createQueryBuilder()
+      .update(Job)
+      .set({
         status: JobStatus.COMPLETED,
         result: result ?? {},
         progress: 100,
         completedAt: new Date(),
-      },
-    );
+      })
+      .where('queue_name = :queueName', { queueName })
+      .andWhere('queue_job_id = :queueJobId', { queueJobId })
+      .andWhere('status != :cancelled', { cancelled: JobStatus.CANCELLED })
+      .execute();
   }
 
   async markFailed(
@@ -66,27 +74,50 @@ export class JobsService {
     queueJobId: string,
     errorMessage: string,
   ): Promise<void> {
-    await this.jobsRepository.update(
-      { queueName, queueJobId },
-      {
+    await this.jobsRepository
+      .createQueryBuilder()
+      .update(Job)
+      .set({
         status: JobStatus.FAILED,
         errorMessage,
         completedAt: new Date(),
-      },
-    );
+      })
+      .where('queue_name = :queueName', { queueName })
+      .andWhere('queue_job_id = :queueJobId', { queueJobId })
+      .andWhere('status != :cancelled', { cancelled: JobStatus.CANCELLED })
+      .execute();
   }
 
   async updateProgress(queueName: string, queueJobId: string, progress: number): Promise<void> {
+    await this.jobsRepository
+      .createQueryBuilder()
+      .update(Job)
+      .set({ progress })
+      .where('queue_name = :queueName', { queueName })
+      .andWhere('queue_job_id = :queueJobId', { queueJobId })
+      .andWhere('status != :cancelled', { cancelled: JobStatus.CANCELLED })
+      .execute();
+  }
+
+  async markCancelled(queueName: string, queueJobId: string, reason?: string): Promise<void> {
     await this.jobsRepository.update(
       { queueName, queueJobId },
       {
-        progress,
+        status: JobStatus.CANCELLED,
+        errorMessage: reason || 'Cancelled by user',
+        completedAt: new Date(),
       },
     );
   }
 
   async findById(jobId: string): Promise<Job | null> {
     return this.jobsRepository.findOne({ where: { id: jobId } });
+  }
+
+  async findByQueue(queueName: string, queueJobId: string): Promise<Job | null> {
+    return this.jobsRepository.findOne({
+      where: { queueName, queueJobId },
+    });
   }
 
   async findForUser(

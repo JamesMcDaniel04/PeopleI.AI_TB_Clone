@@ -58,6 +58,66 @@ export class PromptBuilderService {
       systemPrompt,
       userPrompt,
       temperature: Number.isFinite(parsedTemperature as number) ? (parsedTemperature as number) : 0.7,
+      outputSchema: promptDefinition?.outputSchema || this.getDefaultOutputSchema(objectType),
+    };
+  }
+
+  getDefaultOutputSchema(objectType: string): Record<string, any> {
+    const recordSchema = this.getRecordSchema(objectType);
+
+    return {
+      type: 'object',
+      required: ['records'],
+      properties: {
+        records: {
+          type: 'array',
+          items: recordSchema,
+          minItems: 1,
+        },
+      },
+      additionalProperties: true,
+    };
+  }
+
+  getEmailOutputSchema(): Record<string, any> {
+    return {
+      type: 'object',
+      required: ['emails'],
+      properties: {
+        emails: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            required: ['subject', 'body', 'direction'],
+            properties: {
+              subject: { type: 'string' },
+              body: { type: 'string' },
+              direction: { type: 'string' },
+              timestamp: { type: 'string' },
+            },
+            additionalProperties: true,
+          },
+        },
+      },
+      additionalProperties: true,
+    };
+  }
+
+  getCallOutputSchema(): Record<string, any> {
+    return {
+      type: 'object',
+      required: ['transcript', 'summary', 'nextSteps'],
+      properties: {
+        transcript: { type: 'string' },
+        summary: { type: 'string' },
+        nextSteps: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        duration: { type: 'number' },
+      },
+      additionalProperties: true,
     };
   }
 
@@ -244,6 +304,90 @@ Distribute activities across contacts realistically.\n\n`;
 Ensure each record has a unique _localId for tracking.`;
 
     return prompt;
+  }
+
+  private getRecordSchema(objectType: string): Record<string, any> {
+    const base: Record<string, any> = {
+      type: 'object',
+      additionalProperties: true,
+    };
+
+    switch (objectType) {
+      case 'Account':
+        return {
+          ...base,
+          required: ['Name'],
+          properties: {
+            Name: { type: 'string' },
+            Industry: { type: 'string' },
+            Website: { type: 'string' },
+            Phone: { type: 'string' },
+            _localId: { type: 'string' },
+          },
+        };
+      case 'Contact':
+        return {
+          ...base,
+          required: ['LastName', '_parentLocalId'],
+          properties: {
+            FirstName: { type: 'string' },
+            LastName: { type: 'string' },
+            Email: { type: 'string' },
+            _localId: { type: 'string' },
+            _parentLocalId: { type: 'string' },
+          },
+        };
+      case 'Opportunity':
+        return {
+          ...base,
+          required: ['Name', 'StageName', 'CloseDate', '_parentLocalId'],
+          properties: {
+            Name: { type: 'string' },
+            StageName: { type: 'string' },
+            CloseDate: { type: 'string' },
+            _localId: { type: 'string' },
+            _parentLocalId: { type: 'string' },
+          },
+        };
+      case 'Task':
+        return {
+          ...base,
+          required: ['Subject'],
+          properties: {
+            Subject: { type: 'string' },
+            Status: { type: 'string' },
+            ActivityDate: { type: 'string' },
+            WhoId_localId: { type: 'string' },
+            WhatId_localId: { type: 'string' },
+          },
+        };
+      case 'Event':
+        return {
+          ...base,
+          required: ['Subject', 'StartDateTime', 'EndDateTime'],
+          properties: {
+            Subject: { type: 'string' },
+            StartDateTime: { type: 'string' },
+            EndDateTime: { type: 'string' },
+            WhoId_localId: { type: 'string' },
+            WhatId_localId: { type: 'string' },
+          },
+        };
+      case 'EmailMessage':
+        return {
+          ...base,
+          required: ['Subject', 'TextBody', 'RelatedToId_localId'],
+          properties: {
+            Subject: { type: 'string' },
+            TextBody: { type: 'string' },
+            FromAddress: { type: 'string' },
+            ToAddress: { type: 'string' },
+            RelatedToId_localId: { type: 'string' },
+          },
+        };
+      default:
+        return base;
+    }
   }
 
   buildEmailPrompt(

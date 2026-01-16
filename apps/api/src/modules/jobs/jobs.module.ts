@@ -37,12 +37,12 @@ export class JobsModule {
       ),
     ];
 
+    if (options.processors || options.controllers) {
+      imports.push(forwardRef(() => DatasetsModule));
+    }
+
     if (options.processors) {
-      imports.push(
-        forwardRef(() => DatasetsModule),
-        forwardRef(() => SalesforceModule),
-        forwardRef(() => GeneratorModule),
-      );
+      imports.push(forwardRef(() => SalesforceModule), forwardRef(() => GeneratorModule));
     }
 
     return {

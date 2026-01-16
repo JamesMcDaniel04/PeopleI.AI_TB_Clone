@@ -32,6 +32,19 @@ export class QueueService {
     private jobsService: JobsService,
   ) {}
 
+  private getQueueByName(queueName: string): Queue<any> | null {
+    switch (queueName) {
+      case 'generation':
+        return this.generationQueue;
+      case 'injection':
+        return this.injectionQueue;
+      case 'cleanup':
+        return this.cleanupQueue;
+      default:
+        return null;
+    }
+  }
+
   async addGenerationJob(data: GenerationJobData): Promise<Job<GenerationJobData>> {
     this.logger.log(`Adding generation job for dataset ${data.datasetId}`);
 
@@ -171,5 +184,31 @@ export class QueueService {
 
     await job.remove();
     return true;
+  }
+
+  async cancelJob(
+    queueName: string,
+    queueJobId: string,
+  ): Promise<{ cancelled: boolean; state?: string }> {
+    const queue = this.getQueueByName(queueName);
+    if (!queue) {
+      return { cancelled: false };
+    }
+
+    const job = await queue.getJob(queueJobId);
+    if (!job) {
+      return { cancelled: false };
+    }
+
+    const state = await job.getState();
+    if (state === 'completed' || state === 'failed') {
+      return { cancelled: false, state };
+    }
+
+    if (state !== 'active') {
+      await job.remove();
+    }
+
+    return { cancelled: true, state };
   }
 }

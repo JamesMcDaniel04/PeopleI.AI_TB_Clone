@@ -7,6 +7,7 @@ import { DatasetsService } from '../../datasets/datasets.service';
 import { DatasetStatus } from '../../datasets/entities/dataset.entity';
 import { GenerationJobData } from '../services/queue.service';
 import { JobsService } from '../jobs.service';
+import { JobStatus } from '../entities/job.entity';
 
 @Processor('generation')
 export class GenerationProcessor extends WorkerHost {
@@ -30,7 +31,19 @@ export class GenerationProcessor extends WorkerHost {
       await job.updateProgress(0);
 
       // Execute the generation
-      await this.generatorService.executeGeneration(datasetId);
+      const queueJobId = String(job.id);
+      const shouldCancel = async () => {
+        const current = await this.jobsService.findByQueue('generation', queueJobId);
+        return current?.status === JobStatus.CANCELLED;
+      };
+
+      await this.generatorService.executeGeneration(
+        datasetId,
+        async (progress) => {
+          await job.updateProgress(progress);
+        },
+        shouldCancel,
+      );
 
       await job.updateProgress(100);
 

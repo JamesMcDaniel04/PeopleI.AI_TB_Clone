@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
 import { PromptBuilderService } from './services/prompt-builder.service';
 import { DataTransformerService } from './services/data-transformer.service';
@@ -19,6 +20,7 @@ export class GeneratorService {
     private templatesService: TemplatesService,
     private datasetsService: DatasetsService,
     private queueService: QueueService,
+    private configService: ConfigService,
   ) {}
 
   async startGeneration(userId: string, dto: GenerateDataDto): Promise<Dataset> {
@@ -51,7 +53,11 @@ export class GeneratorService {
     return dataset;
   }
 
-  async executeGeneration(datasetId: string): Promise<void> {
+  async executeGeneration(
+    datasetId: string,
+    onProgress?: (progress: number) => Promise<void> | void,
+    shouldCancel?: () => Promise<boolean> | boolean,
+  ): Promise<void> {
     const dataset = await this.datasetsService.findById(datasetId);
     if (!dataset) {
       throw new NotFoundException('Dataset not found');
@@ -68,6 +74,23 @@ export class GeneratorService {
       const generationOrder = ['Account', 'Contact', 'Opportunity', 'Task', 'Event'];
       const recordMap = new Map<string, any[]>();
       const totalRecords: Record<string, number> = {};
+      const batchSize = this.configService.get<number>('openai.batchSize') || 25;
+      const totalToGenerate = generationOrder.reduce(
+        (sum, objectType) => sum + (dataset.config.recordCounts?.[objectType] || 0),
+        0,
+      );
+      let processedCount = 0;
+
+      const reportProgress = async () => {
+        if (!onProgress || totalToGenerate === 0) {
+          return;
+        }
+        const progress = Math.min(
+          99,
+          Math.floor((processedCount / totalToGenerate) * 100),
+        );
+        await onProgress(progress);
+      };
 
       for (const objectType of generationOrder) {
         const count = dataset.config.recordCounts?.[objectType] || 0;
@@ -77,37 +100,57 @@ export class GeneratorService {
 
         this.logger.log(`Generating ${count} ${objectType} records`);
 
-        const prompt = this.promptBuilder.buildPrompt(
-          template,
-          objectType,
-          count,
-          recordMap,
-          dataset.config,
-        );
+        let remaining = count;
+        while (remaining > 0) {
+          if (shouldCancel && (await shouldCancel())) {
+            throw new Error('Job cancelled');
+          }
 
-        const gptResponse = await this.openaiService.generateStructuredData(prompt);
+          const batchCount = Math.min(batchSize, remaining);
 
-        const transformedRecords = this.dataTransformer.transformToSalesforceFormat(
-          gptResponse,
-          objectType,
-          recordMap,
-        );
+          const prompt = this.promptBuilder.buildPrompt(
+            template,
+            objectType,
+            batchCount,
+            recordMap,
+            dataset.config,
+          );
 
-        recordMap.set(objectType, transformedRecords);
-        totalRecords[objectType] = transformedRecords.length;
-
-        // Save records to database
-        for (const record of transformedRecords) {
-          await this.datasetsService.createRecord({
-            datasetId,
-            salesforceObject: objectType,
-            localId: record._localId,
-            parentLocalId: record._parentLocalId,
-            data: record,
+          const gptResponse = await this.openaiService.generateStructuredData(prompt, {
+            schema: prompt.outputSchema,
+            schemaName: `${objectType} generation schema`,
+            maxRetries: 1,
           });
-        }
 
-        this.logger.log(`Generated ${transformedRecords.length} ${objectType} records`);
+          const responseRecords = Array.isArray(gptResponse.records) ? gptResponse.records : [];
+          const transformedRecords = this.dataTransformer.transformToSalesforceFormat(
+            { records: responseRecords },
+            objectType,
+            recordMap,
+          );
+
+          const existingRecords = recordMap.get(objectType) || [];
+          recordMap.set(objectType, [...existingRecords, ...transformedRecords]);
+          totalRecords[objectType] =
+            (totalRecords[objectType] || 0) + transformedRecords.length;
+
+          // Save records to database
+          for (const record of transformedRecords) {
+            await this.datasetsService.createRecord({
+              datasetId,
+              salesforceObject: objectType,
+              localId: record._localId,
+              parentLocalId: record._parentLocalId,
+              data: record,
+            });
+          }
+
+          processedCount += transformedRecords.length;
+          await reportProgress();
+
+          this.logger.log(`Generated ${transformedRecords.length} ${objectType} records`);
+          remaining -= batchCount;
+        }
       }
 
       // Update dataset status and record counts
@@ -116,6 +159,10 @@ export class GeneratorService {
         recordCounts: totalRecords,
         completedAt: new Date(),
       });
+
+      if (onProgress) {
+        await onProgress(100);
+      }
 
       this.logger.log(`Generation completed for dataset ${datasetId}`);
     } catch (error: any) {
@@ -180,7 +227,11 @@ export class GeneratorService {
       emailCount,
     );
 
-    const result = await this.openaiService.generateStructuredData(prompt);
+    const result = await this.openaiService.generateStructuredData(prompt, {
+      schema: this.promptBuilder.getEmailOutputSchema(),
+      schemaName: 'email thread schema',
+      maxRetries: 1,
+    });
 
     // Transform and save email records
     const emails = Array.isArray(result.emails) ? result.emails : [];
@@ -249,7 +300,11 @@ export class GeneratorService {
       durationMinutes,
     );
 
-    const result = await this.openaiService.generateStructuredData(prompt);
+    const result = await this.openaiService.generateStructuredData(prompt, {
+      schema: this.promptBuilder.getCallOutputSchema(),
+      schemaName: 'call transcript schema',
+      maxRetries: 1,
+    });
 
     const callRecord = this.dataTransformer.generateCallRecord(
       result,
