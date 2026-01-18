@@ -76,6 +76,21 @@ export class SalesforceObjectMapperService {
       delete data.WhatId_localId;
     }
 
+    // Generic mapping for any *_localId fields (supports custom objects)
+    for (const [key, value] of Object.entries(data)) {
+      if (!key.endsWith('_localId')) {
+        continue;
+      }
+      if (typeof value === 'string') {
+        const mappedId = idMap.get(value);
+        if (mappedId) {
+          const targetField = key.replace(/_localId$/, '');
+          data[targetField] = mappedId;
+        }
+      }
+      delete data[key];
+    }
+
     // Remove internal metadata fields
     for (const key of Object.keys(data)) {
       if (key.startsWith('_') || data[key] === undefined) {
@@ -92,6 +107,18 @@ export class SalesforceObjectMapperService {
    */
   getInjectionOrder(): string[] {
     return ['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'];
+  }
+
+  /**
+   * Get injection order for a specific set of object types.
+   * Known objects keep their dependency order; unknown types are appended.
+   */
+  getInjectionOrderFor(objectTypes: string[]): string[] {
+    const uniqueTypes = Array.from(new Set(objectTypes));
+    const baseOrder = this.getInjectionOrder();
+    const ordered = baseOrder.filter((type) => uniqueTypes.includes(type));
+    const remaining = uniqueTypes.filter((type) => !ordered.includes(type));
+    return [...ordered, ...remaining];
   }
 
   /**
@@ -140,6 +167,7 @@ export class SalesforceObjectMapperService {
   validateRecords(
     records: DatasetRecord[],
     idMap: Map<string, string>,
+    options?: { requiredFields?: string[] },
   ): {
     valid: DatasetRecord[];
     failed: { record: DatasetRecord; error: string }[];
@@ -151,7 +179,9 @@ export class SalesforceObjectMapperService {
       const errors: string[] = [];
       const data = record.data || {};
 
-      switch (record.salesforceObject) {
+      const objectType = record.salesforceObject;
+
+      switch (objectType) {
         case 'Account':
           if (!data.Name) {
             errors.push('Missing Account Name');
@@ -219,6 +249,41 @@ export class SalesforceObjectMapperService {
           break;
       }
 
+      if (options?.requiredFields?.length) {
+        const requiredMissing = options.requiredFields.filter((fieldName) => {
+          const value = data[fieldName];
+          if (value !== undefined && value !== null && value !== '') {
+            return false;
+          }
+
+          const localIdField = `${fieldName}_localId`;
+          if (data[localIdField] && idMap.has(data[localIdField])) {
+            return false;
+          }
+
+          const relationships = RELATIONSHIP_FIELDS[objectType] || {};
+          const parentType = PARENT_OBJECT_MAP[objectType];
+          const parentField = Object.entries(relationships).find(
+            ([_, relatedType]) => relatedType === parentType,
+          )?.[0];
+
+          if (
+            parentField &&
+            fieldName === parentField &&
+            record.parentLocalId &&
+            idMap.has(record.parentLocalId)
+          ) {
+            return false;
+          }
+
+          return true;
+        });
+
+        if (requiredMissing.length > 0) {
+          errors.push(`Missing required fields: ${requiredMissing.join(', ')}`);
+        }
+      }
+
       if (errors.length > 0) {
         failed.push({ record, error: errors.join('; ') });
       } else {
@@ -235,6 +300,13 @@ export class SalesforceObjectMapperService {
    */
   getCleanupOrder(): string[] {
     return this.getInjectionOrder().reverse();
+  }
+
+  /**
+   * Get cleanup order for a specific set of object types.
+   */
+  getCleanupOrderFor(objectTypes: string[]): string[] {
+    return this.getInjectionOrderFor(objectTypes).reverse();
   }
 
   /**
@@ -258,5 +330,27 @@ export class SalesforceObjectMapperService {
     }
 
     return cleaned;
+  }
+
+  getRequiredFieldsFromDescribe(describe: any): string[] {
+    const fields = Array.isArray(describe?.fields) ? describe.fields : [];
+    return fields
+      .filter(
+        (field) =>
+          field.createable &&
+          field.nillable === false &&
+          field.defaultedOnCreate === false &&
+          field.calculated === false &&
+          field.autoNumber === false,
+      )
+      .map((field) => field.name);
+  }
+
+  getDefaultRecordTypeId(describe: any): string | null {
+    const recordTypes = Array.isArray(describe?.recordTypeInfos)
+      ? describe.recordTypeInfos
+      : [];
+    const defaultType = recordTypes.find((info) => info.defaultRecordTypeMapping);
+    return defaultType?.recordTypeId || null;
   }
 }

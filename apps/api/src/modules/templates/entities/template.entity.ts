@@ -70,6 +70,7 @@ export class Template {
       Opportunity?: number;
       Task?: number;
       Event?: number;
+      EmailMessage?: number;
     };
     scenarios?: string[];
   };

@@ -211,4 +211,27 @@ export class QueueService {
 
     return { cancelled: true, state };
   }
+
+  async getQueueMetrics(): Promise<Record<string, any>> {
+    const queues = ['generation', 'injection', 'cleanup'];
+    const metrics: Record<string, any> = {};
+
+    for (const queueName of queues) {
+      const queue = this.getQueueByName(queueName);
+      if (!queue) {
+        continue;
+      }
+
+      const counts = await queue.getJobCounts(
+        'waiting',
+        'active',
+        'completed',
+        'failed',
+        'delayed',
+      );
+      metrics[queueName] = counts;
+    }
+
+    return metrics;
+  }
 }

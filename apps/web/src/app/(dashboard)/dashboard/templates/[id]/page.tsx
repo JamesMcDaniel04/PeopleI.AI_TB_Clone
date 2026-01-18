@@ -12,6 +12,7 @@ type PromptForm = {
   systemPrompt: string;
   userPromptTemplate: string;
   temperature?: number;
+  outputSchemaText?: string;
 };
 
 const OBJECT_TYPES = ['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'];
@@ -38,6 +39,7 @@ export default function TemplateDetailPage() {
       Opportunity: 0,
       Task: 0,
       Event: 0,
+      EmailMessage: 0,
     },
   });
 
@@ -63,6 +65,7 @@ export default function TemplateDetailPage() {
         Opportunity: defaultCounts.Opportunity || 0,
         Task: defaultCounts.Task || 0,
         Event: defaultCounts.Event || 0,
+        EmailMessage: defaultCounts.EmailMessage || 0,
       },
     });
 
@@ -74,12 +77,16 @@ export default function TemplateDetailPage() {
       const existing = promptMap.get(objectType);
       const temperatureValue =
         existing?.temperature !== undefined ? Number(existing.temperature) : 0.7;
+      const outputSchemaText = existing?.outputSchema
+        ? JSON.stringify(existing.outputSchema, null, 2)
+        : '';
 
       return {
         salesforceObject: objectType,
         systemPrompt: existing?.systemPrompt || '',
         userPromptTemplate: existing?.userPromptTemplate || '',
         temperature: Number.isNaN(temperatureValue) ? 0.7 : temperatureValue,
+        outputSchemaText,
       };
     });
 
@@ -112,14 +119,13 @@ export default function TemplateDetailPage() {
   });
 
   const updatePromptsMutation = useMutation({
-    mutationFn: () =>
-      api.templates.upsertPrompts(
-        templateId,
-        prompts.map((prompt) => ({
-          ...prompt,
-          temperature: Number(prompt.temperature ?? 0.7),
-        })),
-      ),
+    mutationFn: (payload: Array<{
+      salesforceObject: string;
+      systemPrompt: string;
+      userPromptTemplate: string;
+      temperature?: number;
+      outputSchema?: Record<string, any>;
+    }>) => api.templates.upsertPrompts(templateId, payload),
     onSuccess: (response) => {
       queryClient.setQueryData(['template', templateId], {
         ...template,
@@ -131,6 +137,38 @@ export default function TemplateDetailPage() {
       setPromptError(error.response?.data?.message || 'Failed to update prompts.');
     },
   });
+
+  const handleSavePrompts = () => {
+    try {
+      const payload = prompts.map((prompt) => {
+        let outputSchema;
+        if (prompt.outputSchemaText && prompt.outputSchemaText.trim().length > 0) {
+          try {
+            outputSchema = JSON.parse(prompt.outputSchemaText);
+          } catch (error) {
+            throw new Error(
+              `Output schema for ${prompt.salesforceObject} is invalid JSON.`,
+            );
+          }
+        }
+
+        return {
+          salesforceObject: prompt.salesforceObject,
+          systemPrompt: prompt.systemPrompt,
+          userPromptTemplate: prompt.userPromptTemplate,
+          temperature: Number(prompt.temperature ?? 0.7),
+          outputSchema,
+        };
+      });
+
+      setPromptError(null);
+      updatePromptsMutation.mutate(payload);
+    } catch (error: any) {
+      setPromptError(
+        error?.message || 'Invalid JSON schema. Please check your schema and try again.',
+      );
+    }
+  };
 
   const promptSections = useMemo(
     () =>
@@ -252,7 +290,7 @@ export default function TemplateDetailPage() {
 
           <div>
             <label className="label">Default Record Counts</label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mt-2">
               {Object.entries(metaState.recordCounts).map(([objectType, value]) => (
                 <div key={objectType}>
                   <label className="text-xs text-gray-500">{objectType}</label>
@@ -295,7 +333,7 @@ export default function TemplateDetailPage() {
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Prompt Library</h2>
           <button
-            onClick={() => updatePromptsMutation.mutate()}
+            onClick={handleSavePrompts}
             disabled={updatePromptsMutation.isPending}
             className="btn btn-primary btn-md"
           >
@@ -368,6 +406,26 @@ export default function TemplateDetailPage() {
                     }}
                     className="input mt-1 font-mono text-xs"
                   />
+                </div>
+                <div>
+                  <label className="label">Output Schema (JSON)</label>
+                  <textarea
+                    rows={6}
+                    value={prompt.outputSchemaText || ''}
+                    onChange={(event) => {
+                      const next = [...prompts];
+                      next[index] = {
+                        ...next[index],
+                        outputSchemaText: event.target.value,
+                      };
+                      setPrompts(next);
+                    }}
+                    className="input mt-1 font-mono text-xs"
+                    placeholder='{"type":"object","properties":{"records":{"type":"array"}}}'
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Leave blank to use default schemas.
+                  </p>
                 </div>
                 <p className="text-xs text-gray-500">
                   Available placeholders:{' '}

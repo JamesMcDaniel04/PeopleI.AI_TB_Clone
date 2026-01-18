@@ -71,7 +71,7 @@ export class GeneratorService {
 
     try {
       // Generation order respects dependencies
-      const generationOrder = ['Account', 'Contact', 'Opportunity', 'Task', 'Event'];
+      const generationOrder = ['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'];
       const recordMap = new Map<string, any[]>();
       const totalRecords: Record<string, number> = {};
       const batchSize = this.configService.get<number>('openai.batchSize') || 25;

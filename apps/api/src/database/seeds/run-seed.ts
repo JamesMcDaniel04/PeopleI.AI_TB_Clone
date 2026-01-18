@@ -18,6 +18,7 @@ const defaultTemplates: Partial<Template>[] = [
         Opportunity: 8,
         Task: 20,
         Event: 10,
+        EmailMessage: 10,
       },
       scenarios: [
         'Enterprise software sales',
@@ -39,6 +40,7 @@ const defaultTemplates: Partial<Template>[] = [
         Opportunity: 6,
         Task: 15,
         Event: 8,
+        EmailMessage: 8,
       },
       scenarios: [
         'Hospital system evaluation',
@@ -60,6 +62,7 @@ const defaultTemplates: Partial<Template>[] = [
         Opportunity: 6,
         Task: 15,
         Event: 8,
+        EmailMessage: 8,
       },
       scenarios: [
         'Wealth management platform',
@@ -81,6 +84,7 @@ const defaultTemplates: Partial<Template>[] = [
         Opportunity: 10,
         Task: 25,
         Event: 10,
+        EmailMessage: 10,
       },
       scenarios: [
         'New business development',

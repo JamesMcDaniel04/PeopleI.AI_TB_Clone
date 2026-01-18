@@ -252,6 +252,19 @@ Distribute activities across contacts realistically.
 `;
     }
 
+    if (objectType === 'EmailMessage' && existingRecords.has('Opportunity')) {
+      const opportunities = existingRecords.get('Opportunity')!;
+
+      return `Link these email messages to opportunities (RelatedToId_localId):
+
+Opportunities:
+${JSON.stringify(opportunities.map((o) => ({ _localId: o._localId, Name: o.Name })), null, 2)}
+
+Distribute email threads across opportunities and keep the tone realistic.
+
+`;
+    }
+
     return '';
   }
 

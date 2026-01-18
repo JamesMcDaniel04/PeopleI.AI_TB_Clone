@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SalesforceRestApiService } from './services/salesforce-rest-api.service';
 import { SalesforceBulkApiService } from './services/salesforce-bulk-api.service';
 import { SalesforceObjectMapperService } from './services/salesforce-object-mapper.service';
@@ -30,11 +31,13 @@ interface InjectionOptions {
 @Injectable()
 export class SalesforceService {
   private readonly logger = new Logger(SalesforceService.name);
+  private describeCache = new Map<string, { expiresAt: number; data: any }>();
 
   constructor(
     private restApiService: SalesforceRestApiService,
     private bulkApiService: SalesforceBulkApiService,
     private objectMapper: SalesforceObjectMapperService,
+    private configService: ConfigService,
   ) {}
 
   async injectRecords(
@@ -48,7 +51,7 @@ export class SalesforceService {
     const recordsByObject = this.objectMapper.groupRecordsByObject(records);
 
     // Get injection order
-    const injectionOrder = this.objectMapper.getInjectionOrder();
+    const injectionOrder = this.objectMapper.getInjectionOrderFor([...recordsByObject.keys()]);
 
     // Track results and ID mappings
     const result: InjectionResult = {
@@ -70,7 +73,30 @@ export class SalesforceService {
 
       this.logger.log(`Injecting ${objectRecords.length} ${objectType} records`);
 
-      const validation = this.objectMapper.validateRecords(objectRecords, idMap);
+      let requiredFields: string[] = [];
+      let defaultRecordTypeId: string | null = null;
+
+      try {
+        const describe = await this.getDescribe(environmentId, objectType);
+        requiredFields = this.objectMapper.getRequiredFieldsFromDescribe(describe);
+        defaultRecordTypeId = this.objectMapper.getDefaultRecordTypeId(describe);
+      } catch (error: any) {
+        this.logger.warn(
+          `Describe metadata unavailable for ${objectType}: ${error.message}`,
+        );
+      }
+
+      if (defaultRecordTypeId) {
+        objectRecords.forEach((record) => {
+          if (!record.data.RecordTypeId) {
+            record.data.RecordTypeId = defaultRecordTypeId;
+          }
+        });
+      }
+
+      const validation = this.objectMapper.validateRecords(objectRecords, idMap, {
+        requiredFields,
+      });
 
       validation.failed.forEach(({ record, error }) => {
         result.failed.push({
@@ -194,7 +220,7 @@ export class SalesforceService {
     let processed = 0;
 
     // Delete in reverse order (children first)
-    const cleanupOrder = this.objectMapper.getCleanupOrder();
+    const cleanupOrder = this.objectMapper.getCleanupOrderFor([...idsByObject.keys()]);
 
     for (const objectType of cleanupOrder) {
       const ids = idsByObject.get(objectType) || [];
@@ -287,5 +313,22 @@ export class SalesforceService {
     }
 
     return result;
+  }
+
+  private async getDescribe(environmentId: string, objectType: string): Promise<any> {
+    const cacheKey = `${environmentId}:${objectType}`;
+    const cached = this.describeCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    const ttlSeconds =
+      this.configService.get<number>('salesforce.describeCacheTtlSeconds') || 600;
+    const data = await this.restApiService.describeObject(environmentId, objectType);
+    this.describeCache.set(cacheKey, {
+      data,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+    return data;
   }
 }

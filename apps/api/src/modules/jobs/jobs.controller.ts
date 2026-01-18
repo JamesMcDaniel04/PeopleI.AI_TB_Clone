@@ -53,6 +53,50 @@ export class JobsController {
     };
   }
 
+  @Get('admin/all')
+  @ApiOperation({ summary: 'Admin list of all jobs' })
+  @ApiResponse({ status: 200, description: 'Jobs retrieved' })
+  async listAll(
+    @CurrentUser() user: User,
+    @Query('datasetId') datasetId?: string,
+    @Query('userId') userId?: string,
+    @Query('type') type?: JobType,
+    @Query('status') status?: JobStatus,
+    @Query('limit') limit?: string,
+  ) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const jobs = await this.jobsService.findAll({
+      datasetId,
+      userId,
+      type,
+      status,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+
+    return {
+      success: true,
+      data: jobs,
+    };
+  }
+
+  @Get('admin/metrics')
+  @ApiOperation({ summary: 'Admin queue metrics' })
+  @ApiResponse({ status: 200, description: 'Queue metrics retrieved' })
+  async metrics(@CurrentUser() user: User) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const metrics = await this.queueService.getQueueMetrics();
+    return {
+      success: true,
+      data: metrics,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get job by ID' })
   @ApiResponse({ status: 200, description: 'Job retrieved' })

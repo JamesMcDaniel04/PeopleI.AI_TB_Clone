@@ -89,6 +89,7 @@ export class TemplatesService {
             Opportunity: 8,
             Task: 20,
             Event: 10,
+            EmailMessage: 10,
           },
           scenarios: [
             'Enterprise software sales',
@@ -110,6 +111,7 @@ export class TemplatesService {
             Opportunity: 6,
             Task: 15,
             Event: 8,
+            EmailMessage: 8,
           },
           scenarios: [
             'Hospital system evaluation',
@@ -131,6 +133,7 @@ export class TemplatesService {
             Opportunity: 6,
             Task: 15,
             Event: 8,
+            EmailMessage: 8,
           },
           scenarios: [
             'Wealth management platform',
@@ -152,6 +155,7 @@ export class TemplatesService {
             Opportunity: 10,
             Task: 25,
             Event: 10,
+            EmailMessage: 10,
           },
           scenarios: [
             'New business development',

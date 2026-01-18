@@ -27,6 +27,7 @@ interface GenerationConfig {
     Opportunity: number;
     Task: number;
     Event: number;
+    EmailMessage: number;
   };
   scenario?: string;
   industry?: string;
@@ -43,6 +44,7 @@ export default function GeneratePage() {
       Opportunity: 8,
       Task: 20,
       Event: 10,
+      EmailMessage: 10,
     },
   });
 
@@ -257,7 +259,7 @@ export default function GeneratePage() {
             </div>
 
             <div className="space-y-4">
-              {(['Account', 'Contact', 'Opportunity', 'Task', 'Event'] as const).map(
+              {(['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'] as const).map(
                 (objectType) => (
                   <div
                     key={objectType}
@@ -422,6 +424,7 @@ function getObjectDescription(objectType: string): string {
     Opportunity: 'Deals/Sales',
     Task: 'Activities & calls',
     Event: 'Meetings',
+    EmailMessage: 'Email threads',
   };
   return descriptions[objectType] || '';
 }

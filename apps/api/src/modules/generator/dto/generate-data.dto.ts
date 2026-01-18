@@ -46,6 +46,13 @@ class RecordCountsDto {
   @Min(0)
   @Max(200)
   Event?: number;
+
+  @ApiPropertyOptional({ example: 10, minimum: 0, maximum: 200 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  EmailMessage?: number;
 }
 
 export class GenerateDataDto {

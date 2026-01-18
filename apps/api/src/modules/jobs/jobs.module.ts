@@ -11,6 +11,7 @@ import { SalesforceModule } from '../salesforce/salesforce.module';
 import { GeneratorModule } from '../generator/generator.module';
 import { JobsService } from './jobs.service';
 import { JobsController } from './jobs.controller';
+import { JobsCleanupService } from './jobs-cleanup.service';
 
 interface JobsModuleOptions {
   processors?: boolean;
@@ -26,6 +27,7 @@ export class JobsModule {
 
     if (options.processors) {
       providers.push(GenerationProcessor, InjectionProcessor, CleanupProcessor);
+      providers.push(JobsCleanupService);
     }
 
     const imports = [

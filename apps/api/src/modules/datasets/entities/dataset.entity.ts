@@ -71,6 +71,7 @@ export class Dataset {
       Opportunity?: number;
       Task?: number;
       Event?: number;
+      EmailMessage?: number;
     };
     scenario?: string;
     industry?: string;

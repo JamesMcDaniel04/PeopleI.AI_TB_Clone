@@ -80,6 +80,9 @@ export const api = {
     getProfile: () => apiClient.get('/users/me'),
     updateProfile: (data: { firstName?: string; lastName?: string }) =>
       apiClient.patch('/users/me', data),
+    adminList: () => apiClient.get('/users'),
+    adminUpdate: (id: string, data: { role?: string; isActive?: boolean }) =>
+      apiClient.patch(`/users/${id}/admin`, data),
   },
 
   // Environments
@@ -172,5 +175,13 @@ export const api = {
     get: (id: string) => apiClient.get(`/jobs/${id}`),
     cancel: (id: string) => apiClient.post(`/jobs/${id}/cancel`),
     retry: (id: string) => apiClient.post(`/jobs/${id}/retry`),
+    adminList: (params?: {
+      datasetId?: string;
+      userId?: string;
+      type?: string;
+      status?: string;
+      limit?: number;
+    }) => apiClient.get('/jobs/admin/all', { params }),
+    metrics: () => apiClient.get('/jobs/admin/metrics'),
   },
 };

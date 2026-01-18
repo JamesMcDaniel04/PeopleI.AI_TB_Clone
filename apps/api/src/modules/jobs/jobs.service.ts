@@ -147,4 +147,49 @@ export class JobsService {
 
     return query.getMany();
   }
+
+  async findAll(
+    filters?: { datasetId?: string; userId?: string; type?: JobType; status?: JobStatus; limit?: number },
+  ): Promise<Job[]> {
+    const query = this.jobsRepository
+      .createQueryBuilder('job')
+      .orderBy('job.createdAt', 'DESC');
+
+    if (filters?.datasetId) {
+      query.andWhere('job.datasetId = :datasetId', { datasetId: filters.datasetId });
+    }
+
+    if (filters?.userId) {
+      query.andWhere('job.userId = :userId', { userId: filters.userId });
+    }
+
+    if (filters?.type) {
+      query.andWhere('job.type = :type', { type: filters.type });
+    }
+
+    if (filters?.status) {
+      query.andWhere('job.status = :status', { status: filters.status });
+    }
+
+    if (filters?.limit) {
+      query.take(filters.limit);
+    }
+
+    return query.getMany();
+  }
+
+  async deleteOlderThan(
+    cutoff: Date,
+    statuses: JobStatus[] = [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED],
+  ): Promise<number> {
+    const result = await this.jobsRepository
+      .createQueryBuilder()
+      .delete()
+      .from(Job)
+      .where('status IN (:...statuses)', { statuses })
+      .andWhere('created_at < :cutoff', { cutoff })
+      .execute();
+
+    return result.affected || 0;
+  }
 }

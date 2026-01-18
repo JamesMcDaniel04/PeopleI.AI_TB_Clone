@@ -40,7 +40,16 @@ export default () => ({
     callbackUrl: process.env.SALESFORCE_CALLBACK_URL || 'http://localhost:3000/salesforce/callback',
     loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com',
     oauthStateTtlMinutes: parseInt(process.env.SALESFORCE_OAUTH_STATE_TTL_MINUTES || '15', 10),
+    describeCacheTtlSeconds: parseInt(process.env.SALESFORCE_DESCRIBE_CACHE_TTL_SECONDS || '600', 10),
   },
 
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+
+  jobs: {
+    retentionDays: parseInt(process.env.JOB_RETENTION_DAYS || '30', 10),
+    cleanupIntervalMinutes: parseInt(
+      process.env.JOB_CLEANUP_INTERVAL_MINUTES || '60',
+      10,
+    ),
+  },
 });

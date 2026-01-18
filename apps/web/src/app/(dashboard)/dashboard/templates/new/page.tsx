@@ -23,6 +23,7 @@ export default function NewTemplatePage() {
       Opportunity: 8,
       Task: 20,
       Event: 10,
+      EmailMessage: 10,
     },
   });
 
@@ -139,7 +140,7 @@ export default function NewTemplatePage() {
 
         <div>
           <label className="label">Default Record Counts</label>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mt-2">
             {Object.entries(formState.recordCounts).map(([objectType, value]) => (
               <div key={objectType}>
                 <label className="text-xs text-gray-500">{objectType}</label>

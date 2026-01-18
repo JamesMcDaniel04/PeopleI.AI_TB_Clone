@@ -19,6 +19,7 @@ export interface RecordCounts {
   Opportunity?: number;
   Task?: number;
   Event?: number;
+  EmailMessage?: number;
 }
 
 export interface TemplateConfig {
