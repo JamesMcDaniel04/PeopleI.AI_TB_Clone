@@ -20,6 +20,12 @@ export enum EnvironmentStatus {
   ERROR = 'error',
 }
 
+export interface EnvironmentInjectionConfig {
+  recordTypeOverrides?: Record<string, string>;
+  fieldMappings?: Record<string, Record<string, string>>;
+  fieldDefaults?: Record<string, Record<string, any>>;
+}
+
 @Entity('environments')
 export class Environment {
   @PrimaryGeneratedColumn('uuid')
@@ -37,6 +43,9 @@ export class Environment {
 
   @Column({ nullable: true })
   description: string;
+
+  @Column({ name: 'injection_config', type: 'jsonb', default: {} })
+  injectionConfig: EnvironmentInjectionConfig;
 
   @Column({ name: 'salesforce_instance_url', nullable: true })
   salesforceInstanceUrl: string;

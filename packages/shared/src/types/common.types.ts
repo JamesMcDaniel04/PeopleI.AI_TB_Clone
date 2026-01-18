@@ -36,6 +36,12 @@ export enum EnvironmentStatus {
   ERROR = 'error',
 }
 
+export interface EnvironmentInjectionConfig {
+  recordTypeOverrides?: Record<string, string>;
+  fieldMappings?: Record<string, Record<string, string>>;
+  fieldDefaults?: Record<string, Record<string, any>>;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -52,6 +58,7 @@ export interface Environment {
   userId: string;
   name: string;
   description?: string;
+  injectionConfig?: EnvironmentInjectionConfig;
   salesforceInstanceUrl?: string;
   salesforceOrgId?: string;
   isSandbox: boolean;

@@ -91,7 +91,14 @@ export const api = {
     get: (id: string) => apiClient.get(`/environments/${id}`),
     create: (data: { name: string; description?: string; isSandbox?: boolean }) =>
       apiClient.post('/environments', data),
-    update: (id: string, data: { name?: string; description?: string }) =>
+    update: (
+      id: string,
+      data: {
+        name?: string;
+        description?: string;
+        injectionConfig?: Record<string, any>;
+      }
+    ) =>
       apiClient.patch(`/environments/${id}`, data),
     delete: (id: string) => apiClient.delete(`/environments/${id}`),
     getAuthUrl: (id: string, isSandbox?: boolean) =>

@@ -17,6 +17,23 @@ import {
   Save,
 } from 'lucide-react';
 
+type RecordTypeOverrideRow = {
+  objectType: string;
+  recordType: string;
+};
+
+type FieldMappingRow = {
+  objectType: string;
+  sourceField: string;
+  targetField: string;
+};
+
+type FieldDefaultRow = {
+  objectType: string;
+  field: string;
+  value: string;
+};
+
 export default function EnvironmentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -35,6 +52,9 @@ export default function EnvironmentDetailPage() {
   });
 
   const [formState, setFormState] = useState({ name: '', description: '' });
+  const [recordTypeOverrides, setRecordTypeOverrides] = useState<RecordTypeOverrideRow[]>([]);
+  const [fieldMappings, setFieldMappings] = useState<FieldMappingRow[]>([]);
+  const [fieldDefaults, setFieldDefaults] = useState<FieldDefaultRow[]>([]);
 
   useEffect(() => {
     if (environment) {
@@ -42,6 +62,9 @@ export default function EnvironmentDetailPage() {
         name: environment.name || '',
         description: environment.description || '',
       });
+      setRecordTypeOverrides(toRecordTypeOverrides(environment.injectionConfig));
+      setFieldMappings(toFieldMappings(environment.injectionConfig));
+      setFieldDefaults(toFieldDefaults(environment.injectionConfig));
     }
   }, [environment]);
 
@@ -50,6 +73,11 @@ export default function EnvironmentDetailPage() {
       api.environments.update(environmentId, {
         name: formState.name,
         description: formState.description || undefined,
+        injectionConfig: buildInjectionConfig(
+          recordTypeOverrides,
+          fieldMappings,
+          fieldDefaults,
+        ),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['environment', environmentId] });
@@ -273,6 +301,271 @@ export default function EnvironmentDetailPage() {
         </div>
       </div>
 
+      <div className="card p-6">
+        <h2 className="text-lg font-semibold text-gray-900">Salesforce Injection Settings</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Override record types, map fields, and set defaults per object type.
+        </p>
+
+        <div className="mt-6 space-y-8">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">Record Type Overrides</h3>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() =>
+                  setRecordTypeOverrides((prev) => [
+                    ...prev,
+                    { objectType: '', recordType: '' },
+                  ])
+                }
+              >
+                Add override
+              </button>
+            </div>
+            {recordTypeOverrides.length === 0 ? (
+              <p className="text-xs text-gray-500">
+                No record type overrides configured.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {recordTypeOverrides.map((row, index) => (
+                  <div key={`${row.objectType}-${index}`} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      value={row.objectType}
+                      onChange={(event) =>
+                        setRecordTypeOverrides((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index
+                              ? { ...item, objectType: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Object (e.g. Opportunity)"
+                    />
+                    <input
+                      type="text"
+                      value={row.recordType}
+                      onChange={(event) =>
+                        setRecordTypeOverrides((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index
+                              ? { ...item, recordType: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="RecordTypeId or name"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() =>
+                        setRecordTypeOverrides((prev) =>
+                          prev.filter((_, idx) => idx !== index)
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">Field Mappings</h3>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() =>
+                  setFieldMappings((prev) => [
+                    ...prev,
+                    { objectType: '', sourceField: '', targetField: '' },
+                  ])
+                }
+              >
+                Add mapping
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Use *_localId when mapping relationship fields (e.g. AccountId_localId -> Account__c_localId).
+            </p>
+            {fieldMappings.length === 0 ? (
+              <p className="text-xs text-gray-500">No field mappings configured.</p>
+            ) : (
+              <div className="space-y-2">
+                {fieldMappings.map((row, index) => (
+                  <div key={`${row.objectType}-${row.sourceField}-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <input
+                      type="text"
+                      value={row.objectType}
+                      onChange={(event) =>
+                        setFieldMappings((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index
+                              ? { ...item, objectType: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Object"
+                    />
+                    <input
+                      type="text"
+                      value={row.sourceField}
+                      onChange={(event) =>
+                        setFieldMappings((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index
+                              ? { ...item, sourceField: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Source field"
+                    />
+                    <input
+                      type="text"
+                      value={row.targetField}
+                      onChange={(event) =>
+                        setFieldMappings((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index
+                              ? { ...item, targetField: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Target field"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() =>
+                        setFieldMappings((prev) =>
+                          prev.filter((_, idx) => idx !== index)
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">Field Defaults</h3>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() =>
+                  setFieldDefaults((prev) => [
+                    ...prev,
+                    { objectType: '', field: '', value: '' },
+                  ])
+                }
+              >
+                Add default
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Values are JSON-parsed when possible. Use quotes to force strings.
+            </p>
+            {fieldDefaults.length === 0 ? (
+              <p className="text-xs text-gray-500">No default values configured.</p>
+            ) : (
+              <div className="space-y-2">
+                {fieldDefaults.map((row, index) => (
+                  <div key={`${row.objectType}-${row.field}-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <input
+                      type="text"
+                      value={row.objectType}
+                      onChange={(event) =>
+                        setFieldDefaults((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index
+                              ? { ...item, objectType: event.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Object"
+                    />
+                    <input
+                      type="text"
+                      value={row.field}
+                      onChange={(event) =>
+                        setFieldDefaults((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index ? { ...item, field: event.target.value } : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Field"
+                    />
+                    <input
+                      type="text"
+                      value={row.value}
+                      onChange={(event) =>
+                        setFieldDefaults((prev) =>
+                          prev.map((item, idx) =>
+                            idx === index ? { ...item, value: event.target.value } : item
+                          )
+                        )
+                      }
+                      className="input"
+                      placeholder="Value"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() =>
+                        setFieldDefaults((prev) =>
+                          prev.filter((_, idx) => idx !== index)
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <button
+            onClick={() => updateMutation.mutate()}
+            disabled={updateMutation.isPending}
+            className="btn btn-primary btn-md"
+          >
+            {updateMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Save Injection Settings
+          </button>
+        </div>
+      </div>
+
       <div className="card p-6 border border-red-100">
         <div className="flex items-center justify-between">
           <div>
@@ -301,4 +594,119 @@ export default function EnvironmentDetailPage() {
       </div>
     </div>
   );
+}
+
+function toRecordTypeOverrides(injectionConfig: any): RecordTypeOverrideRow[] {
+  const overrides = injectionConfig?.recordTypeOverrides || {};
+  return Object.entries(overrides).map(([objectType, recordType]) => ({
+    objectType,
+    recordType: String(recordType),
+  }));
+}
+
+function toFieldMappings(injectionConfig: any): FieldMappingRow[] {
+  const mappings = injectionConfig?.fieldMappings || {};
+  const rows: FieldMappingRow[] = [];
+  Object.entries(mappings).forEach(([objectType, fields]) => {
+    Object.entries(fields as Record<string, string>).forEach(([sourceField, targetField]) => {
+      rows.push({
+        objectType,
+        sourceField,
+        targetField,
+      });
+    });
+  });
+  return rows;
+}
+
+function toFieldDefaults(injectionConfig: any): FieldDefaultRow[] {
+  const defaults = injectionConfig?.fieldDefaults || {};
+  const rows: FieldDefaultRow[] = [];
+  Object.entries(defaults).forEach(([objectType, fields]) => {
+    Object.entries(fields as Record<string, any>).forEach(([field, value]) => {
+      rows.push({
+        objectType,
+        field,
+        value: stringifyDefaultValue(value),
+      });
+    });
+  });
+  return rows;
+}
+
+function stringifyDefaultValue(value: any): string {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildInjectionConfig(
+  recordTypeOverrides: RecordTypeOverrideRow[],
+  fieldMappings: FieldMappingRow[],
+  fieldDefaults: FieldDefaultRow[],
+): Record<string, any> {
+  const config: Record<string, any> = {};
+  const recordTypeMap: Record<string, string> = {};
+  recordTypeOverrides.forEach((row) => {
+    if (row.objectType && row.recordType) {
+      recordTypeMap[row.objectType] = row.recordType;
+    }
+  });
+  if (Object.keys(recordTypeMap).length > 0) {
+    config.recordTypeOverrides = recordTypeMap;
+  }
+
+  const mappingMap: Record<string, Record<string, string>> = {};
+  fieldMappings.forEach((row) => {
+    if (!row.objectType || !row.sourceField || !row.targetField) {
+      return;
+    }
+    if (!mappingMap[row.objectType]) {
+      mappingMap[row.objectType] = {};
+    }
+    mappingMap[row.objectType][row.sourceField] = row.targetField;
+  });
+  if (Object.keys(mappingMap).length > 0) {
+    config.fieldMappings = mappingMap;
+  }
+
+  const defaultMap: Record<string, Record<string, any>> = {};
+  fieldDefaults.forEach((row) => {
+    if (!row.objectType || !row.field) {
+      return;
+    }
+    const trimmed = row.value.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (!defaultMap[row.objectType]) {
+      defaultMap[row.objectType] = {};
+    }
+    defaultMap[row.objectType][row.field] = parseDefaultValue(row.value);
+  });
+  if (Object.keys(defaultMap).length > 0) {
+    config.fieldDefaults = defaultMap;
+  }
+
+  return config;
+}
+
+function parseDefaultValue(value: string): any {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
 }

@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { SalesforceRestApiService } from './services/salesforce-rest-api.service';
 import { SalesforceBulkApiService } from './services/salesforce-bulk-api.service';
 import { SalesforceObjectMapperService } from './services/salesforce-object-mapper.service';
+import { Environment } from '../environments/entities/environment.entity';
 
 interface DatasetRecord {
   id: string;
@@ -38,6 +41,8 @@ export class SalesforceService {
     private bulkApiService: SalesforceBulkApiService,
     private objectMapper: SalesforceObjectMapperService,
     private configService: ConfigService,
+    @InjectRepository(Environment)
+    private environmentsRepository: Repository<Environment>,
   ) {}
 
   async injectRecords(
@@ -46,6 +51,14 @@ export class SalesforceService {
     options: InjectionOptions = {},
   ): Promise<InjectionResult> {
     const { useBulkApi = true, bulkThreshold = 200, onProgress } = options;
+
+    const environment = await this.environmentsRepository.findOne({
+      where: { id: environmentId },
+    });
+    const injectionConfig = environment?.injectionConfig || {};
+    const recordTypeOverrides = injectionConfig.recordTypeOverrides || {};
+    const fieldMappings = injectionConfig.fieldMappings || {};
+    const fieldDefaults = injectionConfig.fieldDefaults || {};
 
     // Group records by object type
     const recordsByObject = this.objectMapper.groupRecordsByObject(records);
@@ -75,24 +88,44 @@ export class SalesforceService {
 
       let requiredFields: string[] = [];
       let defaultRecordTypeId: string | null = null;
+      let resolvedRecordTypeId: string | null = null;
+      const overrideRecordType = recordTypeOverrides[objectType];
 
       try {
         const describe = await this.getDescribe(environmentId, objectType);
         requiredFields = this.objectMapper.getRequiredFieldsFromDescribe(describe);
         defaultRecordTypeId = this.objectMapper.getDefaultRecordTypeId(describe);
+        if (overrideRecordType) {
+          resolvedRecordTypeId =
+            this.objectMapper.resolveRecordTypeId(describe, overrideRecordType) ||
+            overrideRecordType;
+        }
       } catch (error: any) {
         this.logger.warn(
           `Describe metadata unavailable for ${objectType}: ${error.message}`,
         );
       }
 
-      if (defaultRecordTypeId) {
-        objectRecords.forEach((record) => {
-          if (!record.data.RecordTypeId) {
-            record.data.RecordTypeId = defaultRecordTypeId;
-          }
-        });
+      if (overrideRecordType && !resolvedRecordTypeId) {
+        resolvedRecordTypeId = overrideRecordType;
       }
+
+      const recordTypeToApply = resolvedRecordTypeId || defaultRecordTypeId;
+      const shouldForceRecordType = Boolean(resolvedRecordTypeId);
+      const objectFieldMappings = fieldMappings[objectType] || {};
+      const objectFieldDefaults = fieldDefaults[objectType] || {};
+
+      objectRecords.forEach((record) => {
+        let data = record.data || {};
+        data = this.applyFieldMappings(data, objectFieldMappings);
+        data = this.applyFieldDefaults(data, objectFieldDefaults);
+        if (recordTypeToApply) {
+          if (shouldForceRecordType || !data.RecordTypeId) {
+            data.RecordTypeId = recordTypeToApply;
+          }
+        }
+        record.data = data;
+      });
 
       const validation = this.objectMapper.validateRecords(objectRecords, idMap, {
         requiredFields,
@@ -330,5 +363,56 @@ export class SalesforceService {
       expiresAt: Date.now() + ttlSeconds * 1000,
     });
     return data;
+  }
+
+  private applyFieldMappings(
+    data: Record<string, any>,
+    mappings: Record<string, string>,
+  ): Record<string, any> {
+    if (!mappings || Object.keys(mappings).length === 0) {
+      return data;
+    }
+
+    const next = { ...data };
+    for (const [sourceField, targetField] of Object.entries(mappings)) {
+      if (!sourceField || !targetField) {
+        continue;
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(next, sourceField)) {
+        continue;
+      }
+
+      const value = next[sourceField];
+      const hasTarget = Object.prototype.hasOwnProperty.call(next, targetField);
+      const targetValue = next[targetField];
+      if (!hasTarget || targetValue === undefined || targetValue === null || targetValue === '') {
+        next[targetField] = value;
+      }
+
+      if (targetField !== sourceField) {
+        delete next[sourceField];
+      }
+    }
+
+    return next;
+  }
+
+  private applyFieldDefaults(
+    data: Record<string, any>,
+    defaults: Record<string, any>,
+  ): Record<string, any> {
+    if (!defaults || Object.keys(defaults).length === 0) {
+      return data;
+    }
+
+    const next = { ...data };
+    for (const [field, value] of Object.entries(defaults)) {
+      if (next[field] === undefined || next[field] === null || next[field] === '') {
+        next[field] = value;
+      }
+    }
+
+    return next;
   }
 }

@@ -353,4 +353,35 @@ export class SalesforceObjectMapperService {
     const defaultType = recordTypes.find((info) => info.defaultRecordTypeMapping);
     return defaultType?.recordTypeId || null;
   }
+
+  resolveRecordTypeId(describe: any, value: string): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const recordTypes = Array.isArray(describe?.recordTypeInfos)
+      ? describe.recordTypeInfos
+      : [];
+    const byId = recordTypes.find((info) => info.recordTypeId === value);
+    if (byId?.recordTypeId) {
+      return byId.recordTypeId;
+    }
+
+    const normalized = value.toLowerCase();
+    const byName = recordTypes.find(
+      (info) => info.name?.toLowerCase() === normalized,
+    );
+    if (byName?.recordTypeId) {
+      return byName.recordTypeId;
+    }
+
+    const byDeveloperName = recordTypes.find(
+      (info) => info.developerName?.toLowerCase() === normalized,
+    );
+    if (byDeveloperName?.recordTypeId) {
+      return byDeveloperName.recordTypeId;
+    }
+
+    return null;
+  }
 }

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { formatDateTime, getStatusColor } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -10,6 +10,7 @@ import { Loader2, Activity, Database } from 'lucide-react';
 
 export default function AdminJobsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
   useEffect(() => {
@@ -28,6 +29,22 @@ export default function AdminJobsPage() {
     queryKey: ['admin-jobs'],
     queryFn: () => api.jobs.adminList({ limit: 50 }).then((res) => res.data.data),
     enabled: user?.role === 'admin',
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (jobId: string) => api.jobs.cancel(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-job-metrics'] });
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (jobId: string) => api.jobs.retry(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-job-metrics'] });
+    },
   });
 
   if (!user) {
@@ -117,6 +134,9 @@ export default function AdminJobsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Progress
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -145,6 +165,47 @@ export default function AdminJobsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {job.progress || 0}%
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        <div className="flex items-center gap-2">
+                          {(job.status === 'pending' || job.status === 'processing') && (
+                            <button
+                              onClick={() => {
+                                if (confirm('Cancel this job?')) {
+                                  cancelMutation.mutate(job.id);
+                                }
+                              }}
+                              disabled={
+                                cancelMutation.isPending &&
+                                cancelMutation.variables === job.id
+                              }
+                              className="btn btn-outline btn-sm"
+                            >
+                              {cancelMutation.isPending &&
+                              cancelMutation.variables === job.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                'Cancel'
+                              )}
+                            </button>
+                          )}
+                          {(job.status === 'failed' || job.status === 'cancelled') && (
+                            <button
+                              onClick={() => retryMutation.mutate(job.id)}
+                              disabled={
+                                retryMutation.isPending && retryMutation.variables === job.id
+                              }
+                              className="btn btn-primary btn-sm"
+                            >
+                              {retryMutation.isPending &&
+                              retryMutation.variables === job.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                'Retry'
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
