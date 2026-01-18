@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 
 export interface CreateUserData {
   email: string;
@@ -14,6 +14,7 @@ export interface UpdateUserData {
   firstName?: string;
   lastName?: string;
   isActive?: boolean;
+  role?: UserRole;
 }
 
 @Injectable()

@@ -108,7 +108,9 @@ export class JobsController {
     }
 
     if (job.userId !== user.id) {
-      throw new ForbiddenException('Access denied');
+      if (user.role !== 'admin') {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return {
@@ -127,7 +129,9 @@ export class JobsController {
     }
 
     if (job.userId !== user.id) {
-      throw new ForbiddenException('Access denied');
+      if (user.role !== 'admin') {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     if (!job.queueName || !job.queueJobId) {
@@ -190,7 +194,9 @@ export class JobsController {
     }
 
     if (job.userId !== user.id) {
-      throw new ForbiddenException('Access denied');
+      if (user.role !== 'admin') {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     if (![JobStatus.FAILED, JobStatus.CANCELLED].includes(job.status)) {

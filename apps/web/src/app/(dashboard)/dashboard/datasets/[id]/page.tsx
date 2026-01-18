@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Mail,
   PhoneCall,
+  Download,
 } from 'lucide-react';
 
 export default function DatasetDetailPage() {
@@ -32,6 +33,7 @@ export default function DatasetDetailPage() {
   const [callDuration, setCallDuration] = useState(30);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
+  const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
 
   const { data: dataset, isLoading } = useQuery({
     queryKey: ['dataset', datasetId],
@@ -85,6 +87,22 @@ export default function DatasetDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
       queryClient.invalidateQueries({ queryKey: ['jobs', datasetId] });
+    },
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: () => api.datasets.export(datasetId),
+    onSuccess: (response) => {
+      const payload = response.data.data;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${payload.name || datasetId}.json`;
+      link.click();
+      window.URL.revokeObjectURL(url);
     },
   });
 
@@ -206,6 +224,19 @@ export default function DatasetDetailPage() {
         </div>
 
         <div className="flex gap-3">
+          <button
+            onClick={() => exportMutation.mutate()}
+            disabled={exportMutation.isPending}
+            className="btn btn-outline btn-md"
+          >
+            {exportMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Export JSON
+          </button>
+
           {dataset.status === 'generated' && dataset.environmentId && (
             <button
               onClick={() => injectMutation.mutate()}
@@ -462,39 +493,70 @@ export default function DatasetDetailPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Data Preview
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Details
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {records.slice(0, 50).map((record: any) => (
-                      <tr key={record.id}>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {record.salesforceObject}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 font-mono">
-                          {record.localId}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {record.salesforceId ? (
-                            <span className="text-green-600 font-mono">
-                              {record.salesforceId}
+                      <Fragment key={record.id}>
+                        <tr>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {record.salesforceObject}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500 font-mono">
+                            {record.localId}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {record.salesforceId ? (
+                              <span className="text-green-600 font-mono">
+                                {record.salesforceId}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span
+                              className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(
+                                record.status
+                              )}`}
+                            >
+                              {record.status}
                             </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span
-                            className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(
-                              record.status
-                            )}`}
-                          >
-                            {record.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
-                          {getRecordPreview(record.data)}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
+                            {getRecordPreview(record.data)}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <button
+                              onClick={() =>
+                                setExpandedRecordId(
+                                  expandedRecordId === record.id ? null : record.id
+                                )
+                              }
+                              className="text-primary-600 hover:text-primary-700 text-xs"
+                            >
+                              {expandedRecordId === record.id ? 'Hide' : 'View'}
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedRecordId === record.id && (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-3 bg-gray-50">
+                              {record.errorMessage && (
+                                <p className="text-xs text-red-600 mb-2">
+                                  {record.errorMessage}
+                                </p>
+                              )}
+                              <pre className="text-xs text-gray-600 whitespace-pre-wrap max-h-48 overflow-auto">
+                                {JSON.stringify(record.data, null, 2)}
+                              </pre>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

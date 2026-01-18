@@ -8,10 +8,11 @@ import {
   LayoutDashboard,
   Database,
   FileText,
-  Settings,
   LogOut,
   Sparkles,
   Cloud,
+  Shield,
+  Activity,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -67,6 +68,19 @@ export default function DashboardLayout({
             <NavLink href="/dashboard/templates" icon={<FileText className="h-5 w-5" />}>
               Templates
             </NavLink>
+            {user?.role === 'admin' && (
+              <div className="pt-4 mt-4 border-t space-y-1">
+                <div className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Admin
+                </div>
+                <NavLink href="/dashboard/admin/jobs" icon={<Activity className="h-5 w-5" />}>
+                  Jobs
+                </NavLink>
+                <NavLink href="/dashboard/admin/users" icon={<Shield className="h-5 w-5" />}>
+                  Users
+                </NavLink>
+              </div>
+            )}
           </nav>
 
           {/* User section */}
