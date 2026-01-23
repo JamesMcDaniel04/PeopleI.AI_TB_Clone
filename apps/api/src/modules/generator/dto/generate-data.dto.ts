@@ -26,12 +26,40 @@ class RecordCountsDto {
   @Max(500)
   Contact?: number;
 
+  @ApiPropertyOptional({ example: 10, minimum: 0, maximum: 200 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  Lead?: number;
+
   @ApiPropertyOptional({ example: 10, minimum: 0, maximum: 100 })
   @IsOptional()
   @IsInt()
   @Min(0)
   @Max(100)
   Opportunity?: number;
+
+  @ApiPropertyOptional({ example: 5, minimum: 0, maximum: 100 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  Case?: number;
+
+  @ApiPropertyOptional({ example: 3, minimum: 0, maximum: 50 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(50)
+  Campaign?: number;
+
+  @ApiPropertyOptional({ example: 20, minimum: 0, maximum: 500 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(500)
+  CampaignMember?: number;
 
   @ApiPropertyOptional({ example: 20, minimum: 0, maximum: 500 })
   @IsOptional()
@@ -53,6 +81,9 @@ class RecordCountsDto {
   @Min(0)
   @Max(200)
   EmailMessage?: number;
+
+  // Allow custom objects with dynamic keys
+  [key: string]: number | undefined;
 }
 
 export class GenerateDataDto {

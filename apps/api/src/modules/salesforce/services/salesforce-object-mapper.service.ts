@@ -10,7 +10,11 @@ interface DatasetRecord {
 
 const RELATIONSHIP_FIELDS: Record<string, Record<string, string>> = {
   Contact: { AccountId: 'Account' },
+  Lead: {},
   Opportunity: { AccountId: 'Account' },
+  Case: { AccountId: 'Account', ContactId: 'Contact' },
+  Campaign: {},
+  CampaignMember: { CampaignId: 'Campaign', LeadId: 'Lead', ContactId: 'Contact' },
   Task: { WhoId: 'Contact', WhatId: 'Opportunity' },
   Event: { WhoId: 'Contact', WhatId: 'Opportunity' },
   EmailMessage: { RelatedToId: 'Opportunity' },
@@ -19,6 +23,8 @@ const RELATIONSHIP_FIELDS: Record<string, Record<string, string>> = {
 const PARENT_OBJECT_MAP: Record<string, string> = {
   Contact: 'Account',
   Opportunity: 'Account',
+  Case: 'Account',
+  CampaignMember: 'Campaign',
   Task: 'Contact',
   Event: 'Contact',
   EmailMessage: 'Opportunity',
@@ -106,7 +112,7 @@ export class SalesforceObjectMapperService {
    * Parents must be created before children
    */
   getInjectionOrder(): string[] {
-    return ['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'];
+    return ['Account', 'Contact', 'Lead', 'Campaign', 'Opportunity', 'Case', 'CampaignMember', 'Task', 'Event', 'EmailMessage'];
   }
 
   /**
@@ -243,6 +249,41 @@ export class SalesforceObjectMapperService {
           }
           if (data.RelatedToId_localId && !idMap.has(data.RelatedToId_localId)) {
             errors.push('Missing Opportunity reference');
+          }
+          break;
+        case 'Lead':
+          if (!data.LastName) {
+            errors.push('Missing Lead LastName');
+          }
+          if (!data.Company) {
+            errors.push('Missing Lead Company');
+          }
+          break;
+        case 'Case':
+          if (!data.Subject) {
+            errors.push('Missing Case Subject');
+          }
+          if (data.AccountId_localId && !idMap.has(data.AccountId_localId)) {
+            errors.push('Missing Account reference');
+          }
+          if (data.ContactId_localId && !idMap.has(data.ContactId_localId)) {
+            errors.push('Missing Contact reference');
+          }
+          break;
+        case 'Campaign':
+          if (!data.Name) {
+            errors.push('Missing Campaign Name');
+          }
+          break;
+        case 'CampaignMember':
+          if (!data.CampaignId_localId || !idMap.has(data.CampaignId_localId)) {
+            errors.push('Missing Campaign reference');
+          }
+          // Must have either LeadId or ContactId, but not both
+          const hasLead = data.LeadId_localId && idMap.has(data.LeadId_localId);
+          const hasContact = data.ContactId_localId && idMap.has(data.ContactId_localId);
+          if (!hasLead && !hasContact) {
+            errors.push('Missing Lead or Contact reference');
           }
           break;
         default:

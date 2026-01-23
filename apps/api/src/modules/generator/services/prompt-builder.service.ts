@@ -199,6 +199,66 @@ For tasks with Type "Call", include call-related details in Description.`,
 - WhatId_localId: Reference to related Opportunity's _localId
 
 Create realistic meeting scenarios (discovery calls, demos, contract reviews).`,
+
+      Lead: `Generate Lead (prospective customer) records with these fields:
+- FirstName, LastName: Realistic fictional names
+- Company: Realistic fictional company name
+- Title: Job title
+- Email: Format firstname.lastname@company-demo.com
+- Phone: Format 555-XXX-XXXX
+- Status: "Open - Not Contacted", "Working - Contacted", "Closed - Converted", or "Closed - Not Converted"
+- LeadSource: Web, Partner Referral, Trade Show, Cold Call, Employee Referral, or Advertisement
+- Industry: Industry of the lead's company
+- Rating: Hot, Warm, or Cold
+- NumberOfEmployees: Company size
+- AnnualRevenue: Estimated company revenue
+- Street, City, State, PostalCode, Country: Address fields
+- Description: Notes about the lead
+- _localId: Unique identifier (e.g., "Lead_1")
+
+Generate leads at various stages of qualification with realistic company and contact information.`,
+
+      Case: `Generate Case (support ticket) records with these fields:
+- Subject: Brief case description
+- Description: Detailed problem description
+- Status: New, Working, Escalated, or Closed
+- Priority: Low, Medium, or High
+- Origin: Phone, Email, Web, or Chat
+- Type: Problem, Feature Request, or Question
+- Reason: User didn't attend training, Complex functionality, or Existing problem
+- _localId: Unique identifier (e.g., "Case_1")
+- AccountId_localId: Reference to parent Account's _localId
+- ContactId_localId: Reference to related Contact's _localId
+
+Generate realistic support scenarios relevant to B2B software.`,
+
+      Campaign: `Generate Campaign (marketing campaign) records with these fields:
+- Name: Campaign name
+- Type: Conference, Webinar, Trade Show, Public Relations, Partners, Referral Program, Advertisement, Banner Ads, Direct Mail, Email, or Other
+- Status: Planned, In Progress, Completed, or Aborted
+- StartDate: Campaign start date (YYYY-MM-DD)
+- EndDate: Campaign end date (YYYY-MM-DD)
+- ExpectedRevenue: Projected revenue from campaign
+- BudgetedCost: Allocated budget
+- ActualCost: Actual spending (if In Progress or Completed)
+- ExpectedResponse: Expected response rate (percentage)
+- NumberSent: Number of campaign members
+- Description: Campaign description and goals
+- IsActive: true or false
+- _localId: Unique identifier (e.g., "Campaign_1")
+
+Generate realistic marketing campaigns typical for B2B sales.`,
+
+      CampaignMember: `Generate CampaignMember (campaign participant) records with these fields:
+- Status: Sent or Responded
+- HasResponded: true or false
+- FirstRespondedDate: Date of first response (if responded, YYYY-MM-DD)
+- _localId: Unique identifier (e.g., "CampaignMember_1")
+- CampaignId_localId: Reference to Campaign's _localId
+- LeadId_localId: Reference to Lead's _localId (if lead)
+- ContactId_localId: Reference to Contact's _localId (if contact, mutually exclusive with LeadId)
+
+Link either Leads OR Contacts to Campaigns, not both for the same member.`,
     };
 
     return basePrompt + (objectSpecificPrompts[objectType] || `Generate ${objectType} records.`);
@@ -261,6 +321,45 @@ Opportunities:
 ${JSON.stringify(opportunities.map((o) => ({ _localId: o._localId, Name: o.Name })), null, 2)}
 
 Distribute email threads across opportunities and keep the tone realistic.
+
+`;
+    }
+
+    if (objectType === 'Case' && existingRecords.has('Account')) {
+      const accounts = existingRecords.get('Account')!;
+      const contacts = existingRecords.get('Contact') || [];
+
+      return `Link these cases to accounts (AccountId_localId) and contacts (ContactId_localId):
+
+Accounts:
+${JSON.stringify(accounts.map((a) => ({ _localId: a._localId, Name: a.Name })), null, 2)}
+
+Contacts:
+${JSON.stringify(contacts.map((c) => ({ _localId: c._localId, Name: `${c.FirstName} ${c.LastName}`, AccountId_localId: c._parentLocalId })), null, 2)}
+
+Create realistic support cases for each account. Link cases to contacts from the same account.
+
+`;
+    }
+
+    if (objectType === 'CampaignMember') {
+      const campaigns = existingRecords.get('Campaign') || [];
+      const leads = existingRecords.get('Lead') || [];
+      const contacts = existingRecords.get('Contact') || [];
+
+      return `Link campaign members to campaigns and either leads OR contacts:
+
+Campaigns:
+${JSON.stringify(campaigns.map((c) => ({ _localId: c._localId, Name: c.Name })), null, 2)}
+
+Leads (use LeadId_localId):
+${JSON.stringify(leads.map((l) => ({ _localId: l._localId, Name: `${l.FirstName} ${l.LastName}`, Company: l.Company })), null, 2)}
+
+Contacts (use ContactId_localId):
+${JSON.stringify(contacts.map((c) => ({ _localId: c._localId, Name: `${c.FirstName} ${c.LastName}` })), null, 2)}
+
+IMPORTANT: Each CampaignMember must have either LeadId_localId OR ContactId_localId, but NOT both.
+Distribute members across campaigns with a mix of leads and contacts.
 
 `;
     }
@@ -396,6 +495,69 @@ Ensure each record has a unique _localId for tracking.`;
             FromAddress: { type: 'string' },
             ToAddress: { type: 'string' },
             RelatedToId_localId: { type: 'string' },
+          },
+        };
+      case 'Lead':
+        return {
+          ...base,
+          required: ['LastName', 'Company', 'Status'],
+          properties: {
+            FirstName: { type: 'string' },
+            LastName: { type: 'string' },
+            Company: { type: 'string' },
+            Title: { type: 'string' },
+            Email: { type: 'string' },
+            Phone: { type: 'string' },
+            Status: { type: 'string' },
+            LeadSource: { type: 'string' },
+            Industry: { type: 'string' },
+            Rating: { type: 'string' },
+            _localId: { type: 'string' },
+          },
+        };
+      case 'Case':
+        return {
+          ...base,
+          required: ['Subject', 'Status'],
+          properties: {
+            Subject: { type: 'string' },
+            Description: { type: 'string' },
+            Status: { type: 'string' },
+            Priority: { type: 'string' },
+            Origin: { type: 'string' },
+            Type: { type: 'string' },
+            AccountId_localId: { type: 'string' },
+            ContactId_localId: { type: 'string' },
+            _localId: { type: 'string' },
+          },
+        };
+      case 'Campaign':
+        return {
+          ...base,
+          required: ['Name', 'Status'],
+          properties: {
+            Name: { type: 'string' },
+            Type: { type: 'string' },
+            Status: { type: 'string' },
+            StartDate: { type: 'string' },
+            EndDate: { type: 'string' },
+            Description: { type: 'string' },
+            IsActive: { type: 'boolean' },
+            _localId: { type: 'string' },
+          },
+        };
+      case 'CampaignMember':
+        return {
+          ...base,
+          required: ['Status', 'CampaignId_localId'],
+          properties: {
+            Status: { type: 'string' },
+            HasResponded: { type: 'boolean' },
+            FirstRespondedDate: { type: 'string' },
+            CampaignId_localId: { type: 'string' },
+            LeadId_localId: { type: 'string' },
+            ContactId_localId: { type: 'string' },
+            _localId: { type: 'string' },
           },
         };
       default:

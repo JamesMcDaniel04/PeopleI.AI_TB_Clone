@@ -48,6 +48,14 @@ export class DataTransformerService {
         return this.transformEvent(data);
       case 'EmailMessage':
         return this.transformEmailMessage(data);
+      case 'Lead':
+        return this.transformLead(data);
+      case 'Case':
+        return this.transformCase(data);
+      case 'Campaign':
+        return this.transformCampaign(data);
+      case 'CampaignMember':
+        return this.transformCampaignMember(data);
       default:
         return data;
     }
@@ -135,6 +143,71 @@ export class DataTransformerService {
       MessageDate: this.formatDateTime(record.MessageDate),
       Incoming: this.parseBoolean(record.Incoming),
       RelatedToId_localId: record.RelatedToId_localId,
+    };
+  }
+
+  private transformLead(record: Record<string, any>): Record<string, any> {
+    return {
+      FirstName: record.FirstName,
+      LastName: record.LastName,
+      Company: record.Company,
+      Title: record.Title,
+      Email: this.sanitizeEmail(record.Email),
+      Phone: this.formatPhone(record.Phone),
+      Status: this.validateLeadStatus(record.Status),
+      LeadSource: record.LeadSource,
+      Industry: record.Industry,
+      Rating: record.Rating || 'Warm',
+      NumberOfEmployees: this.parseNumber(record.NumberOfEmployees),
+      AnnualRevenue: this.parseNumber(record.AnnualRevenue),
+      Street: record.Street,
+      City: record.City,
+      State: record.State,
+      PostalCode: record.PostalCode,
+      Country: record.Country || 'USA',
+      Description: record.Description,
+    };
+  }
+
+  private transformCase(record: Record<string, any>): Record<string, any> {
+    return {
+      Subject: record.Subject,
+      Description: record.Description,
+      Status: this.validateCaseStatus(record.Status),
+      Priority: record.Priority || 'Medium',
+      Origin: record.Origin || 'Web',
+      Type: record.Type,
+      Reason: record.Reason,
+      AccountId_localId: record.AccountId_localId,
+      ContactId_localId: record.ContactId_localId,
+    };
+  }
+
+  private transformCampaign(record: Record<string, any>): Record<string, any> {
+    return {
+      Name: record.Name,
+      Type: record.Type || 'Other',
+      Status: this.validateCampaignStatus(record.Status),
+      StartDate: this.formatDate(record.StartDate),
+      EndDate: this.formatDate(record.EndDate),
+      ExpectedRevenue: this.parseNumber(record.ExpectedRevenue),
+      BudgetedCost: this.parseNumber(record.BudgetedCost),
+      ActualCost: this.parseNumber(record.ActualCost),
+      ExpectedResponse: this.parseNumber(record.ExpectedResponse),
+      NumberSent: this.parseNumber(record.NumberSent),
+      Description: record.Description,
+      IsActive: this.parseBoolean(record.IsActive) ?? true,
+    };
+  }
+
+  private transformCampaignMember(record: Record<string, any>): Record<string, any> {
+    return {
+      Status: record.Status || 'Sent',
+      HasResponded: this.parseBoolean(record.HasResponded) ?? false,
+      FirstRespondedDate: record.FirstRespondedDate ? this.formatDate(record.FirstRespondedDate) : null,
+      CampaignId_localId: record.CampaignId_localId,
+      LeadId_localId: record.LeadId_localId,
+      ContactId_localId: record.ContactId_localId,
     };
   }
 
@@ -278,6 +351,41 @@ export class DataTransformerService {
 
     if (!status || !validStatuses.includes(status)) {
       return 'Not Started';
+    }
+
+    return status;
+  }
+
+  private validateLeadStatus(status: string): string {
+    const validStatuses = [
+      'Open - Not Contacted',
+      'Working - Contacted',
+      'Closed - Converted',
+      'Closed - Not Converted',
+    ];
+
+    if (!status || !validStatuses.includes(status)) {
+      return 'Open - Not Contacted';
+    }
+
+    return status;
+  }
+
+  private validateCaseStatus(status: string): string {
+    const validStatuses = ['New', 'Working', 'Escalated', 'Closed'];
+
+    if (!status || !validStatuses.includes(status)) {
+      return 'New';
+    }
+
+    return status;
+  }
+
+  private validateCampaignStatus(status: string): string {
+    const validStatuses = ['Planned', 'In Progress', 'Completed', 'Aborted'];
+
+    if (!status || !validStatuses.includes(status)) {
+      return 'Planned';
     }
 
     return status;
