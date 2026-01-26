@@ -259,6 +259,17 @@ Generate realistic marketing campaigns typical for B2B sales.`,
 - ContactId_localId: Reference to Contact's _localId (if contact, mutually exclusive with LeadId)
 
 Link either Leads OR Contacts to Campaigns, not both for the same member.`,
+
+      EmailMessage: `Generate EmailMessage records with these fields:
+- Subject: Email subject line
+- TextBody: Full email content
+- ToAddress, FromAddress: Use demo-safe domains
+- MessageDate: ISO 8601 timestamp
+- Incoming: true for inbound, false for outbound
+- ParentId_localId: Reference to related Opportunity's _localId
+- _localId: Unique identifier
+
+All emails must be fictional and demo-safe.`,
     };
 
     return basePrompt + (objectSpecificPrompts[objectType] || `Generate ${objectType} records.`);

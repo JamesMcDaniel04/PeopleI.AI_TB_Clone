@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Database,
   FileText,
+  Camera,
   LogOut,
   Sparkles,
   Cloud,
@@ -64,6 +65,9 @@ export default function DashboardLayout({
             </NavLink>
             <NavLink href="/dashboard/datasets" icon={<Database className="h-5 w-5" />}>
               Datasets
+            </NavLink>
+            <NavLink href="/dashboard/snapshots" icon={<Camera className="h-5 w-5" />}>
+              Snapshots
             </NavLink>
             <NavLink href="/dashboard/templates" icon={<FileText className="h-5 w-5" />}>
               Templates

@@ -389,7 +389,7 @@ ${JSON.stringify(
           fieldApiName: field.name,
           relatedObjectApiName: field.referenceTo[0],
           relationshipType: field.cascadeDelete ? 'master-detail' : 'lookup',
-          required: !field.nillable,
+          required: !field.nillable && !field.defaultedOnCreate,
         });
         continue;
       }

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Mail,
   PhoneCall,
+  FileText,
   Download,
 } from 'lucide-react';
 
@@ -31,8 +32,11 @@ export default function DatasetDetailPage() {
   const [emailCount, setEmailCount] = useState(3);
   const [callType, setCallType] = useState('Discovery Call');
   const [callDuration, setCallDuration] = useState(30);
+  const [meetingType, setMeetingType] = useState('demo');
+  const [meetingDuration, setMeetingDuration] = useState(45);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
+  const [meetingError, setMeetingError] = useState<string | null>(null);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
 
   const { data: dataset, isLoading } = useQuery({
@@ -144,6 +148,21 @@ export default function DatasetDetailPage() {
     },
     onError: (error: any) => {
       setCallError(error.response?.data?.message || 'Failed to generate call transcript.');
+    },
+  });
+
+  const meetingMutation = useMutation({
+    mutationFn: () =>
+      api.generator.generateMeeting(datasetId, selectedOpportunity, meetingType, meetingDuration),
+    onSuccess: () => {
+      setMeetingError(null);
+      queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] });
+      queryClient.invalidateQueries({ queryKey: ['dataset-records', datasetId] });
+    },
+    onError: (error: any) => {
+      setMeetingError(
+        error.response?.data?.message || 'Failed to generate meeting transcript.',
+      );
     },
   });
 
@@ -362,7 +381,7 @@ export default function DatasetDetailPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="rounded-lg border p-4 space-y-3">
                   <div className="flex items-center text-sm font-medium text-gray-700">
                     <Mail className="h-4 w-4 mr-2 text-primary-600" />
@@ -431,6 +450,55 @@ export default function DatasetDetailPage() {
                       <PhoneCall className="mr-2 h-4 w-4" />
                     )}
                     Generate Call
+                  </button>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center text-sm font-medium text-gray-700">
+                    <FileText className="h-4 w-4 mr-2 text-primary-600" />
+                    Meeting Transcript
+                  </div>
+                  <div>
+                    <label className="label">Meeting Type</label>
+                    <select
+                      value={meetingType}
+                      onChange={(event) => setMeetingType(event.target.value)}
+                      className="input mt-1"
+                    >
+                      <option value="discovery">Discovery</option>
+                      <option value="demo">Demo</option>
+                      <option value="negotiation">Negotiation</option>
+                      <option value="kickoff">Kickoff</option>
+                      <option value="qbr">QBR</option>
+                      <option value="technical">Technical</option>
+                      <option value="executive">Executive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Duration (minutes)</label>
+                    <input
+                      type="number"
+                      min="15"
+                      max="180"
+                      value={meetingDuration}
+                      onChange={(event) =>
+                        setMeetingDuration(Number(event.target.value) || 15)
+                      }
+                      className="input mt-1 w-28"
+                    />
+                  </div>
+                  {meetingError && <p className="text-xs text-red-600">{meetingError}</p>}
+                  <button
+                    onClick={() => meetingMutation.mutate()}
+                    disabled={!selectedOpportunity || meetingMutation.isPending}
+                    className="btn btn-outline btn-md w-full"
+                  >
+                    {meetingMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="mr-2 h-4 w-4" />
+                    )}
+                    Generate Meeting
                   </button>
                 </div>
               </div>

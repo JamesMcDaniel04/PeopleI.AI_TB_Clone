@@ -15,7 +15,18 @@ type PromptForm = {
   outputSchemaText?: string;
 };
 
-const OBJECT_TYPES = ['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'];
+const OBJECT_TYPES = [
+  'Account',
+  'Contact',
+  'Lead',
+  'Opportunity',
+  'Case',
+  'Campaign',
+  'CampaignMember',
+  'Task',
+  'Event',
+  'EmailMessage',
+];
 
 export default function TemplateDetailPage() {
   const params = useParams();
@@ -36,7 +47,11 @@ export default function TemplateDetailPage() {
     recordCounts: {
       Account: 0,
       Contact: 0,
+      Lead: 0,
       Opportunity: 0,
+      Case: 0,
+      Campaign: 0,
+      CampaignMember: 0,
       Task: 0,
       Event: 0,
       EmailMessage: 0,
@@ -62,7 +77,11 @@ export default function TemplateDetailPage() {
       recordCounts: {
         Account: defaultCounts.Account || 0,
         Contact: defaultCounts.Contact || 0,
+        Lead: defaultCounts.Lead || 0,
         Opportunity: defaultCounts.Opportunity || 0,
+        Case: defaultCounts.Case || 0,
+        Campaign: defaultCounts.Campaign || 0,
+        CampaignMember: defaultCounts.CampaignMember || 0,
         Task: defaultCounts.Task || 0,
         Event: defaultCounts.Event || 0,
         EmailMessage: defaultCounts.EmailMessage || 0,

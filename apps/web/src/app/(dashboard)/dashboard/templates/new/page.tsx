@@ -20,7 +20,11 @@ export default function NewTemplatePage() {
     recordCounts: {
       Account: 5,
       Contact: 15,
+      Lead: 10,
       Opportunity: 8,
+      Case: 5,
+      Campaign: 3,
+      CampaignMember: 20,
       Task: 20,
       Event: 10,
       EmailMessage: 10,

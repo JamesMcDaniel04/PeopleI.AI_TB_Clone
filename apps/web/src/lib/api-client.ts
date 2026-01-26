@@ -145,6 +145,12 @@ export const api = {
       recordCounts: Record<string, number>;
       scenario?: string;
       industry?: string;
+      temporalRealism?: {
+        enabled?: boolean;
+        startDate?: string;
+        endDate?: string;
+        pattern?: 'uniform' | 'front-loaded' | 'back-loaded' | 'bell-curve';
+      };
     }) => apiClient.post('/generate', data),
     getStatus: (datasetId: string) => apiClient.get(`/generate/${datasetId}/status`),
     inject: (datasetId: string) => apiClient.post(`/generate/${datasetId}/inject`),
@@ -152,6 +158,16 @@ export const api = {
       apiClient.post(`/generate/${datasetId}/emails/${opportunityLocalId}`, { emailCount }),
     generateCall: (datasetId: string, opportunityLocalId: string, callType?: string, duration?: number) =>
       apiClient.post(`/generate/${datasetId}/calls/${opportunityLocalId}`, { callType, duration }),
+    generateMeeting: (
+      datasetId: string,
+      opportunityLocalId: string,
+      meetingType?: string,
+      duration?: number,
+    ) =>
+      apiClient.post(`/generate/${datasetId}/meetings/${opportunityLocalId}`, {
+        meetingType,
+        duration,
+      }),
   },
 
   // Datasets
@@ -190,5 +206,32 @@ export const api = {
       limit?: number;
     }) => apiClient.get('/jobs/admin/all', { params }),
     metrics: () => apiClient.get('/jobs/admin/metrics'),
+  },
+
+  // Snapshots
+  snapshots: {
+    list: (params?: {
+      environmentId?: string;
+      type?: string;
+      isGoldenImage?: boolean;
+    }) => apiClient.get('/snapshots', { params }),
+    get: (id: string) => apiClient.get(`/snapshots/${id}`),
+    create: (data: {
+      name: string;
+      description?: string;
+      environmentId: string;
+      type?: string;
+      isGoldenImage?: boolean;
+      recordIds?: Record<string, string[]>;
+      tags?: string[];
+    }) => apiClient.post('/snapshots', data),
+    restore: (id: string, options?: { deleteExisting?: boolean; objectTypes?: string[]; dryRun?: boolean }) =>
+      apiClient.post(`/snapshots/${id}/restore`, options || {}),
+    setGoldenImage: (id: string) => apiClient.post(`/snapshots/${id}/set-golden-image`),
+    remove: (id: string) => apiClient.delete(`/snapshots/${id}`),
+    getGoldenImage: (environmentId: string) =>
+      apiClient.get(`/snapshots/environment/${environmentId}/golden-image`),
+    resetToGolden: (environmentId: string) =>
+      apiClient.post(`/snapshots/environment/${environmentId}/reset-to-golden`),
   },
 };

@@ -162,13 +162,19 @@ export class SnapshotsService {
   ): Promise<string[]> {
     const describe = await this.salesforceRestApi.describeObject(environmentId, objectType);
     const fields = Array.isArray(describe?.fields) ? describe.fields : [];
-    const fieldNames = new Set(fields.map((field: any) => field.name));
     const clauses: string[] = [];
 
-    if (fieldNames.has('Description')) {
+    const descriptionField = fields.find(
+      (field: any) => field.name === 'Description' && field.filterable,
+    );
+    const subjectField = fields.find(
+      (field: any) => field.name === 'Subject' && field.filterable,
+    );
+
+    if (descriptionField) {
       clauses.push(`Description LIKE '%${this.demoMarker}%'`);
     }
-    if (fieldNames.has('Subject')) {
+    if (subjectField) {
       clauses.push(`Subject LIKE '%${this.demoMarker}%'`);
     }
 
@@ -180,8 +186,8 @@ export class SnapshotsService {
     }
 
     const query = `SELECT Id FROM ${objectType} WHERE ${clauses.join(' OR ')} LIMIT 10000`;
-    const result = await this.salesforceRestApi.query(environmentId, query);
-    return result.records.map((record: any) => record.Id);
+    const records = await this.salesforceRestApi.query(environmentId, query);
+    return records.map((record: any) => record.Id);
   }
 
   private async fetchRecordData(
@@ -207,9 +213,9 @@ export class SnapshotsService {
         .join(',');
 
       const query = `SELECT ${fields} FROM ${objectType} WHERE Id IN (${idList})`;
-      const result = await this.salesforceRestApi.query(environmentId, query);
+      const records = await this.salesforceRestApi.query(environmentId, query);
 
-      allRecords.push(...result.records);
+      allRecords.push(...records);
     }
 
     return allRecords;

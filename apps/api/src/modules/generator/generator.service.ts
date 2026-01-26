@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
 import { PromptBuilderService } from './services/prompt-builder.service';
 import { DataTransformerService, TemporalRealism } from './services/data-transformer.service';
-import { TemporalSchedulerService, TemporalConfig } from './services/temporal-scheduler.service';
+import { TemporalSchedulerService } from './services/temporal-scheduler.service';
 import { CustomObjectConfig, CustomObjectGeneratorService } from './services/custom-object-generator.service';
 import { MeetingTranscriptGeneratorService, MeetingConfig } from './services/meeting-transcript-generator.service';
 import { TemplatesService } from '../templates/templates.service';

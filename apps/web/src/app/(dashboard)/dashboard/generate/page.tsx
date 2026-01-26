@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4;
+type TemporalPattern = 'uniform' | 'front-loaded' | 'back-loaded' | 'bell-curve';
 
 interface GenerationConfig {
   name: string;
@@ -32,10 +33,30 @@ interface GenerationConfig {
     Task: number;
     Event: number;
     EmailMessage: number;
+    [key: string]: number;
   };
   scenario?: string;
   industry?: string;
+  temporalRealism?: {
+    enabled?: boolean;
+    startDate?: string;
+    endDate?: string;
+    pattern?: TemporalPattern;
+  };
 }
+
+const STANDARD_OBJECT_TYPES = [
+  'Account',
+  'Contact',
+  'Lead',
+  'Opportunity',
+  'Case',
+  'Campaign',
+  'CampaignMember',
+  'Task',
+  'Event',
+  'EmailMessage',
+] as const;
 
 export default function GeneratePage() {
   const router = useRouter();
@@ -54,7 +75,13 @@ export default function GeneratePage() {
       Event: 10,
       EmailMessage: 10,
     },
+    temporalRealism: {
+      enabled: true,
+      pattern: 'bell-curve',
+    },
   });
+  const [customObjectName, setCustomObjectName] = useState('');
+  const [customObjectCount, setCustomObjectCount] = useState(5);
 
   useEffect(() => {
     const templateId = searchParams.get('templateId');
@@ -83,6 +110,15 @@ export default function GeneratePage() {
 
   const connectedEnvs = environments?.filter((e: any) => e.status === 'connected') || [];
   const selectedTemplate = templates?.find((t: any) => t.id === config.templateId);
+  const customObjectTypes = Object.keys(config.recordCounts || {}).filter(
+    (key) => !STANDARD_OBJECT_TYPES.includes(key as any),
+  );
+  const allObjectTypes = Array.from(
+    new Set([...STANDARD_OBJECT_TYPES, ...customObjectTypes]),
+  );
+  const hasCustomObjects = customObjectTypes.some(
+    (key) => (config.recordCounts?.[key] || 0) > 0,
+  );
 
   const handleNext = () => {
     if (step < 4) setStep((step + 1) as Step);
@@ -104,6 +140,9 @@ export default function GeneratePage() {
       case 2:
         return true; // Environment is optional
       case 3:
+        if (hasCustomObjects && !config.environmentId) {
+          return false;
+        }
         return Object.values(config.recordCounts || {}).some((v) => v > 0);
       case 4:
         return !!config.name;
@@ -267,8 +306,7 @@ export default function GeneratePage() {
             </div>
 
             <div className="space-y-4">
-              {(['Account', 'Contact', 'Lead', 'Opportunity', 'Case', 'Campaign', 'CampaignMember', 'Task', 'Event', 'EmailMessage'] as const).map(
-                (objectType) => (
+              {allObjectTypes.map((objectType) => (
                   <div
                     key={objectType}
                     className="flex items-center justify-between py-3 border-b"
@@ -279,24 +317,173 @@ export default function GeneratePage() {
                         {getObjectDescription(objectType)}
                       </span>
                     </div>
-                    <input
-                      type="number"
-                      min="0"
-                      max={getObjectMax(objectType)}
-                      value={config.recordCounts?.[objectType] || 0}
+                    <div className="flex items-center gap-2">
+                      {!STANDARD_OBJECT_TYPES.includes(objectType as any) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = { ...(config.recordCounts || {}) };
+                            delete next[objectType];
+                            setConfig({ ...config, recordCounts: next });
+                          }}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <input
+                        type="number"
+                        min="0"
+                        max={getObjectMax(objectType)}
+                        value={config.recordCounts?.[objectType] || 0}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            recordCounts: {
+                              ...config.recordCounts!,
+                              [objectType]: parseInt(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="input w-24 text-center"
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="mt-6 space-y-3 rounded-lg border border-dashed border-gray-300 p-4">
+              <h3 className="text-sm font-semibold text-gray-700">Custom Objects</h3>
+              <p className="text-xs text-gray-500">
+                Add Salesforce custom object API names (e.g., <span className="font-mono">Project__c</span>).
+                Requires a connected environment for schema introspection.
+              </p>
+              {!config.environmentId && (
+                <p className="text-xs text-amber-600">
+                  Connect an environment to enable custom object generation.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="text"
+                  value={customObjectName}
+                  onChange={(e) => setCustomObjectName(e.target.value)}
+                  placeholder="CustomObject__c"
+                  className="input flex-1 min-w-[180px]"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max={getObjectMax(customObjectName || 'Custom')}
+                  value={customObjectCount}
+                  onChange={(e) => setCustomObjectCount(parseInt(e.target.value) || 0)}
+                  className="input w-24 text-center"
+                />
+                <button
+                  type="button"
+                  disabled={!customObjectName || !config.environmentId}
+                  onClick={() => {
+                    const trimmed = customObjectName.trim();
+                    if (!trimmed) return;
+                    setConfig({
+                      ...config,
+                      recordCounts: {
+                        ...config.recordCounts!,
+                        [trimmed]: customObjectCount,
+                      },
+                    });
+                    setCustomObjectName('');
+                  }}
+                  className="btn btn-secondary btn-md"
+                >
+                  Add Object
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-lg border border-gray-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700">Temporal Realism</h3>
+                  <p className="text-xs text-gray-500">
+                    Distribute activities across realistic timelines for each opportunity.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={config.temporalRealism?.enabled ?? true}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        temporalRealism: {
+                          ...config.temporalRealism,
+                          enabled: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  Enabled
+                </label>
+              </div>
+              {config.temporalRealism?.enabled !== false && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="label">Pattern</label>
+                    <select
+                      value={config.temporalRealism?.pattern || 'bell-curve'}
                       onChange={(e) =>
                         setConfig({
                           ...config,
-                          recordCounts: {
-                            ...config.recordCounts!,
-                            [objectType]: parseInt(e.target.value) || 0,
+                          temporalRealism: {
+                            ...config.temporalRealism,
+                            pattern: e.target.value as TemporalPattern,
                           },
                         })
                       }
-                      className="input w-24 text-center"
+                      className="input mt-1"
+                    >
+                      <option value="bell-curve">Bell curve</option>
+                      <option value="front-loaded">Front-loaded</option>
+                      <option value="back-loaded">Back-loaded</option>
+                      <option value="uniform">Uniform</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Start Date (optional)</label>
+                    <input
+                      type="date"
+                      value={config.temporalRealism?.startDate || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          temporalRealism: {
+                            ...config.temporalRealism,
+                            startDate: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      className="input mt-1"
                     />
                   </div>
-                )
+                  <div>
+                    <label className="label">End Date (optional)</label>
+                    <input
+                      type="date"
+                      value={config.temporalRealism?.endDate || ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          temporalRealism: {
+                            ...config.temporalRealism,
+                            endDate: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      className="input mt-1"
+                    />
+                  </div>
+                </div>
               )}
             </div>
 
