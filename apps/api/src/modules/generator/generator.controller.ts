@@ -180,4 +180,35 @@ export class GeneratorController {
       message: 'Call transcript generated successfully',
     };
   }
+
+  @Post(':datasetId/meetings/:opportunityLocalId')
+  @ApiOperation({ summary: 'Generate meeting transcript for an opportunity' })
+  @ApiResponse({ status: 200, description: 'Meeting transcript generated' })
+  async generateMeetingTranscript(
+    @Param('datasetId') datasetId: string,
+    @Param('opportunityLocalId') opportunityLocalId: string,
+    @Body() body: { meetingType?: string; duration?: number },
+    @CurrentUser() user: User,
+  ) {
+    const dataset = await this.datasetsService.findById(datasetId);
+
+    if (dataset.userId !== user.id) {
+      return {
+        success: false,
+        error: 'Access denied',
+      };
+    }
+
+    await this.generatorService.generateMeetingTranscript(
+      datasetId,
+      opportunityLocalId,
+      (body.meetingType as any) || 'demo',
+      body.duration || 45,
+    );
+
+    return {
+      success: true,
+      message: 'Meeting transcript generated successfully',
+    };
+  }
 }

@@ -12,6 +12,7 @@ import { GeneratorModule } from '../generator/generator.module';
 import { JobsService } from './jobs.service';
 import { JobsController } from './jobs.controller';
 import { JobsCleanupService } from './jobs-cleanup.service';
+import { SnapshotsModule } from '../snapshots/snapshots.module';
 
 interface JobsModuleOptions {
   processors?: boolean;
@@ -44,7 +45,11 @@ export class JobsModule {
     }
 
     if (options.processors) {
-      imports.push(forwardRef(() => SalesforceModule), forwardRef(() => GeneratorModule));
+      imports.push(
+        forwardRef(() => SalesforceModule),
+        forwardRef(() => GeneratorModule),
+        forwardRef(() => SnapshotsModule),
+      );
     }
 
     return {

@@ -17,6 +17,7 @@ export interface TemporalRealism {
 @Injectable()
 export class DataTransformerService {
   private readonly logger = new Logger(DataTransformerService.name);
+  private readonly demoMarker = '[TestBox Demo Data]';
 
   constructor(private temporalScheduler?: TemporalSchedulerService) {}
 
@@ -72,7 +73,7 @@ export class DataTransformerService {
   }
 
   private transformAccount(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Name: record.Name,
       Industry: record.Industry,
       Website: this.sanitizeUrl(record.Website),
@@ -87,10 +88,11 @@ export class DataTransformerService {
       Description: record.Description,
       Type: record.Type || 'Prospect',
     };
+    return this.applyDemoMarker(transformed, ['Description']);
   }
 
   private transformContact(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       FirstName: record.FirstName,
       LastName: record.LastName,
       Email: this.sanitizeEmail(record.Email),
@@ -98,13 +100,15 @@ export class DataTransformerService {
       Title: record.Title,
       Department: record.Department,
       LeadSource: record.LeadSource,
+      Description: record.Description,
       // Relationship fields will be mapped during injection
       _parentLocalId: record._parentLocalId,
     };
+    return this.applyDemoMarker(transformed, ['Description']);
   }
 
   private transformOpportunity(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Name: record.Name,
       StageName: this.validateStage(record.StageName),
       Amount: this.parseNumber(record.Amount),
@@ -115,10 +119,11 @@ export class DataTransformerService {
       Description: record.Description,
       _parentLocalId: record._parentLocalId,
     };
+    return this.applyDemoMarker(transformed, ['Description']);
   }
 
   private transformTask(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Subject: record.Subject,
       Status: this.validateTaskStatus(record.Status),
       Priority: record.Priority || 'Normal',
@@ -129,10 +134,11 @@ export class DataTransformerService {
       WhoId_localId: record.WhoId_localId,
       WhatId_localId: record.WhatId_localId,
     };
+    return this.applyDemoMarker(transformed, ['Description', 'Subject']);
   }
 
   private transformEvent(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Subject: record.Subject,
       StartDateTime: this.formatDateTime(record.StartDateTime),
       EndDateTime: this.formatDateTime(record.EndDateTime),
@@ -142,22 +148,24 @@ export class DataTransformerService {
       WhoId_localId: record.WhoId_localId,
       WhatId_localId: record.WhatId_localId,
     };
+    return this.applyDemoMarker(transformed, ['Description', 'Subject']);
   }
 
   private transformEmailMessage(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Subject: record.Subject,
       TextBody: record.TextBody || record.Body || record.Description,
       FromAddress: this.sanitizeEmail(record.FromAddress),
       ToAddress: this.sanitizeEmail(record.ToAddress),
       MessageDate: this.formatDateTime(record.MessageDate),
-      Incoming: this.parseBoolean(record.Incoming),
-      RelatedToId_localId: record.RelatedToId_localId,
+      Incoming: this.parseBoolean(record.Incoming) ?? false,
+      ParentId_localId: record.ParentId_localId || record.RelatedToId_localId,
     };
+    return this.applyDemoMarker(transformed, ['Subject', 'TextBody']);
   }
 
   private transformLead(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       FirstName: record.FirstName,
       LastName: record.LastName,
       Company: record.Company,
@@ -177,10 +185,11 @@ export class DataTransformerService {
       Country: record.Country || 'USA',
       Description: record.Description,
     };
+    return this.applyDemoMarker(transformed, ['Description']);
   }
 
   private transformCase(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Subject: record.Subject,
       Description: record.Description,
       Status: this.validateCaseStatus(record.Status),
@@ -191,10 +200,11 @@ export class DataTransformerService {
       AccountId_localId: record.AccountId_localId,
       ContactId_localId: record.ContactId_localId,
     };
+    return this.applyDemoMarker(transformed, ['Description', 'Subject']);
   }
 
   private transformCampaign(record: Record<string, any>): Record<string, any> {
-    return {
+    const transformed = {
       Name: record.Name,
       Type: record.Type || 'Other',
       Status: this.validateCampaignStatus(record.Status),
@@ -208,6 +218,7 @@ export class DataTransformerService {
       Description: record.Description,
       IsActive: this.parseBoolean(record.IsActive) ?? true,
     };
+    return this.applyDemoMarker(transformed, ['Description']);
   }
 
   private transformCampaignMember(record: Record<string, any>): Record<string, any> {
@@ -441,7 +452,7 @@ export class DataTransformerService {
       const subject = email.subject || `Follow up ${index + 1}`;
       const body = email.body || 'Email content not provided.';
 
-      return {
+      const record = {
         _localId: `EmailMessage_${Date.now()}_${index}`,
         Subject: subject,
         TextBody: body,
@@ -449,8 +460,9 @@ export class DataTransformerService {
         ToAddress: isInbound ? sanitizedRepEmail : sanitizedContactEmail,
         MessageDate: this.formatDateTime(email.timestamp || new Date().toISOString()),
         Incoming: isInbound,
-        RelatedToId_localId: opportunityLocalId,
+        ParentId_localId: opportunityLocalId,
       };
+      return this.applyDemoMarker(record, ['Subject', 'TextBody']);
     });
   }
 
@@ -463,7 +475,7 @@ export class DataTransformerService {
     opportunityLocalId: string,
     subject: string,
   ): Record<string, any> {
-    return {
+    const record = {
       _localId: `Call_${Date.now()}`,
       Subject: subject,
       Description: `${callData.summary}\n\n--- TRANSCRIPT ---\n${callData.transcript}`,
@@ -476,6 +488,7 @@ export class DataTransformerService {
       // Custom tracking
       _callDuration: callData.duration,
     };
+    return this.applyDemoMarker(record, ['Description', 'Subject']);
   }
 
   /**
@@ -502,7 +515,8 @@ export class DataTransformerService {
     const unlinkedRecords: GeneratedRecord[] = [];
 
     for (const record of records) {
-      const oppLocalId = record.WhatId_localId || record.RelatedToId_localId;
+      const oppLocalId =
+        record.WhatId_localId || record.ParentId_localId || record.RelatedToId_localId;
       if (oppLocalId) {
         const existing = recordsByOpportunity.get(oppLocalId) || [];
         existing.push(record);
@@ -634,7 +648,7 @@ export class DataTransformerService {
       const isInbound = direction === 'inbound';
       const timestamp = timestamps[index];
 
-      return {
+      const record = {
         _localId: `EmailMessage_${Date.now()}_${index}`,
         Subject: email.subject || `Re: Follow up`,
         TextBody: email.body || 'Email content',
@@ -642,8 +656,9 @@ export class DataTransformerService {
         ToAddress: isInbound ? sanitizedRepEmail : sanitizedContactEmail,
         MessageDate: timestamp.toISOString(),
         Incoming: isInbound,
-        RelatedToId_localId: opportunityLocalId,
+        ParentId_localId: opportunityLocalId,
       };
+      return this.applyDemoMarker(record, ['Subject', 'TextBody']);
     });
   }
 
@@ -686,7 +701,7 @@ export class DataTransformerService {
 
     taskSlots.forEach((slot, index) => {
       const isPast = slot.date < new Date();
-      tasks.push({
+      const record = {
         _localId: `Task_${Date.now()}_${index}`,
         Subject: `${taskTypes[index % taskTypes.length]} - ${opportunity.name}`,
         Status: isPast ? 'Completed' : 'Not Started',
@@ -696,7 +711,8 @@ export class DataTransformerService {
         Type: 'Other',
         WhoId_localId: contact.localId,
         WhatId_localId: opportunity.localId,
-      });
+      };
+      tasks.push(this.applyDemoMarker(record, ['Description', 'Subject']));
     });
 
     // Generate events (meetings)
@@ -710,7 +726,7 @@ export class DataTransformerService {
     const eventTypes = ['Discovery Call', 'Product Demo', 'Technical Review', 'Contract Negotiation', 'Executive Briefing'];
 
     eventSlots.forEach((slot, index) => {
-      events.push({
+      const record = {
         _localId: `Event_${Date.now()}_${index}`,
         Subject: `${eventTypes[index % eventTypes.length]} - ${contact.firstName} ${contact.lastName}`,
         StartDateTime: slot.startDateTime,
@@ -720,9 +736,38 @@ export class DataTransformerService {
         Type: 'Meeting',
         WhoId_localId: contact.localId,
         WhatId_localId: opportunity.localId,
-      });
+      };
+      events.push(this.applyDemoMarker(record, ['Description', 'Subject']));
     });
 
     return { tasks, events, emails };
+  }
+
+  private applyDemoMarker(
+    record: Record<string, any>,
+    fields: string[],
+  ): Record<string, any> {
+    for (const field of fields) {
+      if (!Object.prototype.hasOwnProperty.call(record, field)) {
+        continue;
+      }
+      record[field] = this.appendDemoMarker(record[field], field === 'Subject' ? ' ' : '\n');
+      return record;
+    }
+    return record;
+  }
+
+  private appendDemoMarker(value: any, separator: string): string {
+    const marker = this.demoMarker;
+    if (value === null || value === undefined || value === '') {
+      return marker;
+    }
+
+    const text = String(value);
+    if (text.includes(marker)) {
+      return text;
+    }
+
+    return `${text}${separator}${marker}`;
   }
 }

@@ -68,13 +68,24 @@ export class Dataset {
     recordCounts?: {
       Account?: number;
       Contact?: number;
+      Lead?: number;
       Opportunity?: number;
+      Case?: number;
+      Campaign?: number;
+      CampaignMember?: number;
       Task?: number;
       Event?: number;
       EmailMessage?: number;
+      [key: string]: number | undefined;
     };
     scenario?: string;
     industry?: string;
+    temporalRealism?: {
+      enabled?: boolean;
+      startDate?: string;
+      endDate?: string;
+      pattern?: 'uniform' | 'front-loaded' | 'back-loaded' | 'bell-curve';
+    };
   };
 
   @Column({ name: 'record_counts', type: 'jsonb', default: {} })

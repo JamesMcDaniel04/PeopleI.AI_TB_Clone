@@ -46,7 +46,7 @@ export const RELATIONSHIP_FIELDS: Record<string, Record<string, string>> = {
   CampaignMember: { CampaignId: 'Campaign', LeadId: 'Lead', ContactId: 'Contact' },
   Task: { WhoId: 'Contact', WhatId: 'Opportunity' },
   Event: { WhoId: 'Contact', WhatId: 'Opportunity' },
-  EmailMessage: { RelatedToId: 'Opportunity' },
+  EmailMessage: { ParentId: 'Opportunity' },
 };
 
 export const OPPORTUNITY_STAGES = [

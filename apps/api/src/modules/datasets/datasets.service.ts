@@ -164,6 +164,18 @@ export class DatasetsService {
     );
   }
 
+  async updateRecordsData(
+    datasetId: string,
+    updates: Array<{ localId: string; data: Record<string, any> }>,
+  ): Promise<void> {
+    for (const update of updates) {
+      await this.recordsRepository.update(
+        { datasetId, localId: update.localId },
+        { data: update.data },
+      );
+    }
+  }
+
   async getInjectedRecords(datasetId: string): Promise<{ objectType: string; id: string }[]> {
     const records = await this.recordsRepository.find({
       where: { datasetId, status: RecordStatus.INJECTED },

@@ -11,7 +11,11 @@ import { Template } from './template.entity';
 export enum SalesforceObject {
   ACCOUNT = 'Account',
   CONTACT = 'Contact',
+  LEAD = 'Lead',
   OPPORTUNITY = 'Opportunity',
+  CASE = 'Case',
+  CAMPAIGN = 'Campaign',
+  CAMPAIGN_MEMBER = 'CampaignMember',
   TASK = 'Task',
   EVENT = 'Event',
   EMAIL_MESSAGE = 'EmailMessage',

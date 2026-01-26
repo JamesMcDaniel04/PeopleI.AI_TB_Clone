@@ -26,6 +26,7 @@ export interface RestoreSnapshotOptions {
 @Injectable()
 export class SnapshotsService {
   private readonly logger = new Logger(SnapshotsService.name);
+  private readonly demoMarker = '[TestBox Demo Data]';
 
   constructor(
     @InjectRepository(Snapshot)
@@ -40,10 +41,7 @@ export class SnapshotsService {
    * Create a snapshot of the current environment state
    */
   async createSnapshot(userId: string, dto: CreateSnapshotDto): Promise<Snapshot> {
-    const environment = await this.environmentsService.findOne(dto.environmentId, userId);
-    if (!environment) {
-      throw new NotFoundException('Environment not found');
-    }
+    const environment = await this.environmentsService.findById(dto.environmentId, userId);
 
     // Create the snapshot record
     const snapshot = this.snapshotRepository.create({
@@ -89,10 +87,7 @@ export class SnapshotsService {
     }
 
     try {
-      const credentials = await this.environmentsService.getCredentials(
-        snapshot.environmentId,
-        userId,
-      );
+      const environmentId = snapshot.environmentId;
 
       const recordIds: Record<string, string[]> = {};
       const recordData: Record<string, Record<string, any>[]> = {};
@@ -114,17 +109,13 @@ export class SnapshotsService {
             ids = specifiedRecordIds[objectType];
           } else {
             // Query for all records created by our system (with demo marker)
-            const queryResult = await this.salesforceRestApi.query(
-              credentials,
-              `SELECT Id FROM ${objectType} WHERE Description LIKE '%[TestBox Demo Data]%' OR Subject LIKE '%[Demo]%' LIMIT 10000`,
-            );
-            ids = queryResult.records.map((r: any) => r.Id);
+            ids = await this.findDemoRecordIds(environmentId, objectType);
           }
 
           if (ids.length === 0) continue;
 
           // Fetch full record data
-          const records = await this.fetchRecordData(credentials, objectType, ids);
+          const records = await this.fetchRecordData(environmentId, objectType, ids);
 
           recordIds[objectType] = ids;
           recordData[objectType] = records;
@@ -165,8 +156,36 @@ export class SnapshotsService {
   /**
    * Fetch full record data for a list of IDs
    */
+  private async findDemoRecordIds(
+    environmentId: string,
+    objectType: string,
+  ): Promise<string[]> {
+    const describe = await this.salesforceRestApi.describeObject(environmentId, objectType);
+    const fields = Array.isArray(describe?.fields) ? describe.fields : [];
+    const fieldNames = new Set(fields.map((field: any) => field.name));
+    const clauses: string[] = [];
+
+    if (fieldNames.has('Description')) {
+      clauses.push(`Description LIKE '%${this.demoMarker}%'`);
+    }
+    if (fieldNames.has('Subject')) {
+      clauses.push(`Subject LIKE '%${this.demoMarker}%'`);
+    }
+
+    if (clauses.length === 0) {
+      this.logger.warn(
+        `Snapshot skip: ${objectType} has no Description/Subject field for demo marker filtering`,
+      );
+      return [];
+    }
+
+    const query = `SELECT Id FROM ${objectType} WHERE ${clauses.join(' OR ')} LIMIT 10000`;
+    const result = await this.salesforceRestApi.query(environmentId, query);
+    return result.records.map((record: any) => record.Id);
+  }
+
   private async fetchRecordData(
-    credentials: any,
+    environmentId: string,
     objectType: string,
     ids: string[],
   ): Promise<Record<string, any>[]> {
@@ -181,14 +200,14 @@ export class SnapshotsService {
       const idList = batchIds.map((id) => `'${id}'`).join(',');
 
       // Get field list from describe
-      const describe = await this.salesforceRestApi.describeObject(credentials, objectType);
+      const describe = await this.salesforceRestApi.describeObject(environmentId, objectType);
       const fields = describe.fields
         .filter((f: any) => f.createable || f.name === 'Id')
         .map((f: any) => f.name)
         .join(',');
 
       const query = `SELECT ${fields} FROM ${objectType} WHERE Id IN (${idList})`;
-      const result = await this.salesforceRestApi.query(credentials, query);
+      const result = await this.salesforceRestApi.query(environmentId, query);
 
       allRecords.push(...result.records);
     }
@@ -231,17 +250,14 @@ export class SnapshotsService {
     });
 
     try {
-      const credentials = await this.environmentsService.getCredentials(
-        snapshot.environmentId,
-        userId,
-      );
+      const environmentId = snapshot.environmentId;
 
       const errors: string[] = [];
       let recordsRestored = 0;
 
       // Optionally delete existing data first
       if (options.deleteExisting) {
-        await this.deleteExistingData(credentials, snapshot, options.objectTypes);
+        await this.deleteExistingData(environmentId, snapshot, options.objectTypes);
       }
 
       // Restore in dependency order
@@ -265,7 +281,7 @@ export class SnapshotsService {
           // Use bulk API for large datasets
           if (preparedRecords.length > 50) {
             const result = await this.salesforceBulkApi.insertRecords(
-              credentials,
+              environmentId,
               objectType,
               preparedRecords,
             );
@@ -284,7 +300,7 @@ export class SnapshotsService {
             for (let i = 0; i < preparedRecords.length; i++) {
               try {
                 const result = await this.salesforceRestApi.createRecord(
-                  credentials,
+                  environmentId,
                   objectType,
                   preparedRecords[i],
                 );
@@ -369,7 +385,7 @@ export class SnapshotsService {
    * Delete existing demo data before restore
    */
   private async deleteExistingData(
-    credentials: any,
+    environmentId: string,
     snapshot: Snapshot,
     objectTypes?: string[],
   ): Promise<void> {
@@ -382,11 +398,11 @@ export class SnapshotsService {
 
       try {
         if (ids.length > 50) {
-          await this.salesforceBulkApi.deleteRecords(credentials, objectType, ids);
+          await this.salesforceBulkApi.deleteRecords(environmentId, objectType, ids);
         } else {
           for (const id of ids) {
             try {
-              await this.salesforceRestApi.deleteRecord(credentials, objectType, id);
+              await this.salesforceRestApi.deleteRecord(environmentId, objectType, id);
             } catch (error) {
               // Record may already be deleted
               this.logger.warn(`Could not delete ${objectType} ${id}: ${error.message}`);

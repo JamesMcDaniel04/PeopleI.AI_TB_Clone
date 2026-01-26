@@ -17,7 +17,7 @@ const RELATIONSHIP_FIELDS: Record<string, Record<string, string>> = {
   CampaignMember: { CampaignId: 'Campaign', LeadId: 'Lead', ContactId: 'Contact' },
   Task: { WhoId: 'Contact', WhatId: 'Opportunity' },
   Event: { WhoId: 'Contact', WhatId: 'Opportunity' },
-  EmailMessage: { RelatedToId: 'Opportunity' },
+  EmailMessage: { ParentId: 'Opportunity' },
 };
 
 const PARENT_OBJECT_MAP: Record<string, string> = {
@@ -247,7 +247,8 @@ export class SalesforceObjectMapperService {
           if (!data.TextBody) {
             errors.push('Missing EmailMessage TextBody');
           }
-          if (data.RelatedToId_localId && !idMap.has(data.RelatedToId_localId)) {
+          const parentLocalId = data.ParentId_localId || data.RelatedToId_localId;
+          if (parentLocalId && !idMap.has(parentLocalId)) {
             errors.push('Missing Opportunity reference');
           }
           break;

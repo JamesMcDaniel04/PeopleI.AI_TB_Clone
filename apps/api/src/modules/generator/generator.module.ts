@@ -9,9 +9,10 @@ import { CustomObjectGeneratorService } from './services/custom-object-generator
 import { MeetingTranscriptGeneratorService } from './services/meeting-transcript-generator.service';
 import { TemplatesModule } from '../templates/templates.module';
 import { DatasetsModule } from '../datasets/datasets.module';
+import { SalesforceModule } from '../salesforce/salesforce.module';
 
 @Module({
-  imports: [TemplatesModule, DatasetsModule],
+  imports: [TemplatesModule, DatasetsModule, SalesforceModule],
   controllers: [GeneratorController],
   providers: [
     GeneratorService,

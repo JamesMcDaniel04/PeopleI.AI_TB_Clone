@@ -9,6 +9,7 @@ import { RecordStatus } from '../../datasets/entities/dataset-record.entity';
 import { InjectionJobData } from '../services/queue.service';
 import { JobsService } from '../jobs.service';
 import { JobStatus } from '../entities/job.entity';
+import { SnapshotsService } from '../../snapshots/snapshots.service';
 
 @Processor('injection')
 export class InjectionProcessor extends WorkerHost {
@@ -19,6 +20,7 @@ export class InjectionProcessor extends WorkerHost {
     private datasetsService: DatasetsService,
     private eventEmitter: EventEmitter2,
     private jobsService: JobsService,
+    private snapshotsService: SnapshotsService,
   ) {
     super();
   }
@@ -37,8 +39,22 @@ export class InjectionProcessor extends WorkerHost {
         }
       };
 
+      const dataset = await this.datasetsService.findById(datasetId);
+
       // Update dataset status
       await this.datasetsService.updateStatus(datasetId, DatasetStatus.INJECTING);
+
+      try {
+        await this.snapshotsService.createPreInjectionSnapshot(
+          environmentId,
+          job.data.userId,
+          dataset.name,
+        );
+      } catch (snapshotError: any) {
+        this.logger.warn(
+          `Pre-injection snapshot skipped for dataset ${datasetId}: ${snapshotError.message}`,
+        );
+      }
 
       // Get all generated records
       const records = await this.datasetsService.getRecords(datasetId);

@@ -95,6 +95,9 @@ export class SalesforceService {
         const describe = await this.getDescribe(environmentId, objectType);
         requiredFields = this.objectMapper.getRequiredFieldsFromDescribe(describe);
         defaultRecordTypeId = this.objectMapper.getDefaultRecordTypeId(describe);
+        if (objectType === 'EmailMessage') {
+          this.normalizeEmailMessageReferences(objectRecords, describe);
+        }
         if (overrideRecordType) {
           resolvedRecordTypeId =
             this.objectMapper.resolveRecordTypeId(describe, overrideRecordType) ||
@@ -363,6 +366,36 @@ export class SalesforceService {
       expiresAt: Date.now() + ttlSeconds * 1000,
     });
     return data;
+  }
+
+  private normalizeEmailMessageReferences(records: DatasetRecord[], describe: any): void {
+    const fields = Array.isArray(describe?.fields) ? describe.fields : [];
+    const createableFields = new Set(
+      fields.filter((field: any) => field.createable).map((field: any) => field.name),
+    );
+
+    const hasParentId = createableFields.has('ParentId');
+    const hasRelatedToId = createableFields.has('RelatedToId');
+
+    if (!hasParentId && !hasRelatedToId) {
+      return;
+    }
+
+    const targetField = hasParentId ? 'ParentId' : 'RelatedToId';
+    const sourceField = targetField === 'ParentId' ? 'RelatedToId' : 'ParentId';
+    const targetLocal = `${targetField}_localId`;
+    const sourceLocal = `${sourceField}_localId`;
+
+    for (const record of records) {
+      const data = record.data || {};
+      if (!data[targetLocal] && data[sourceLocal]) {
+        data[targetLocal] = data[sourceLocal];
+      }
+      if (data[sourceLocal]) {
+        delete data[sourceLocal];
+      }
+      record.data = data;
+    }
   }
 
   private applyFieldMappings(

@@ -7,6 +7,9 @@ import {
   Min,
   Max,
   ValidateNested,
+  IsBoolean,
+  IsDateString,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -86,6 +89,28 @@ class RecordCountsDto {
   [key: string]: number | undefined;
 }
 
+class TemporalRealismDto {
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiPropertyOptional({ example: '2024-01-01T00:00:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2024-03-31T23:59:59.000Z' })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ example: 'bell-curve' })
+  @IsOptional()
+  @IsIn(['uniform', 'front-loaded', 'back-loaded', 'bell-curve'])
+  pattern?: 'uniform' | 'front-loaded' | 'back-loaded' | 'bell-curve';
+}
+
 export class GenerateDataDto {
   @ApiProperty({ example: 'Q1 Demo Dataset' })
   @IsString()
@@ -119,4 +144,10 @@ export class GenerateDataDto {
   @IsOptional()
   @IsString()
   industry?: string;
+
+  @ApiPropertyOptional({ description: 'Temporal realism for activity generation' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TemporalRealismDto)
+  temporalRealism?: TemporalRealismDto;
 }

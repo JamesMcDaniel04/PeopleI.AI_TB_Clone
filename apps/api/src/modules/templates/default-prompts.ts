@@ -55,6 +55,24 @@ Include a "_localId" field for each record (e.g., "Account_1", "Account_2") for 
 
 Generate varied seniority levels (C-suite, VP, Director, Manager) appropriate for deal involvement.`,
 
+  [SalesforceObject.LEAD]: `${BASE_SYSTEM_PROMPT}Generate Lead (prospective customer) records with these fields:
+- FirstName, LastName: Realistic fictional names
+- Company: Realistic fictional company name
+- Title: Job title
+- Email: Format firstname.lastname@company-demo.com
+- Phone: Format 555-XXX-XXXX
+- Status: "Open - Not Contacted", "Working - Contacted", "Closed - Converted", or "Closed - Not Converted"
+- LeadSource: Web, Partner Referral, Trade Show, Cold Call, Employee Referral, or Advertisement
+- Industry: Industry of the lead's company
+- Rating: Hot, Warm, or Cold
+- NumberOfEmployees: Company size
+- AnnualRevenue: Estimated company revenue
+- Street, City, State, PostalCode, Country: Address fields
+- Description: Notes about the lead
+- _localId: Unique identifier (e.g., "Lead_1")
+
+Generate leads at various stages of qualification with realistic company and contact information.`,
+
   [SalesforceObject.OPPORTUNITY]: `${BASE_SYSTEM_PROMPT}Generate Opportunity (deal) records with these fields:
 - Name: Deal name format "[Company] - [Product/Service]"
 - StageName: Prospecting, Qualification, Needs Analysis, Value Proposition, Negotiation, or Closed Won
@@ -68,6 +86,48 @@ Generate varied seniority levels (C-suite, VP, Director, Manager) appropriate fo
 - _parentLocalId: Reference to parent Account's _localId
 
 Vary the stages and amounts realistically.`,
+
+  [SalesforceObject.CASE]: `${BASE_SYSTEM_PROMPT}Generate Case (support ticket) records with these fields:
+- Subject: Brief case description
+- Description: Detailed problem description
+- Status: New, Working, Escalated, or Closed
+- Priority: Low, Medium, or High
+- Origin: Phone, Email, Web, or Chat
+- Type: Problem, Feature Request, or Question
+- Reason: User didn't attend training, Complex functionality, or Existing problem
+- AccountId_localId: Reference to parent Account's _localId
+- ContactId_localId: Reference to related Contact's _localId
+- _localId: Unique identifier (e.g., "Case_1")
+
+Generate realistic support scenarios relevant to B2B software.`,
+
+  [SalesforceObject.CAMPAIGN]: `${BASE_SYSTEM_PROMPT}Generate Campaign (marketing campaign) records with these fields:
+- Name: Campaign name
+- Type: Conference, Webinar, Trade Show, Public Relations, Partners, Referral Program, Advertisement, Banner Ads, Direct Mail, Email, or Other
+- Status: Planned, In Progress, Completed, or Aborted
+- StartDate: Campaign start date (YYYY-MM-DD)
+- EndDate: Campaign end date (YYYY-MM-DD)
+- ExpectedRevenue: Projected revenue from campaign
+- BudgetedCost: Allocated budget
+- ActualCost: Actual spending (if In Progress or Completed)
+- ExpectedResponse: Expected response rate (percentage)
+- NumberSent: Number of campaign members
+- Description: Campaign description and goals
+- IsActive: true or false
+- _localId: Unique identifier (e.g., "Campaign_1")
+
+Generate realistic marketing campaigns typical for B2B sales.`,
+
+  [SalesforceObject.CAMPAIGN_MEMBER]: `${BASE_SYSTEM_PROMPT}Generate CampaignMember (campaign participant) records with these fields:
+- Status: Sent or Responded
+- HasResponded: true or false
+- FirstRespondedDate: Date of first response (if responded, YYYY-MM-DD)
+- CampaignId_localId: Reference to Campaign's _localId
+- LeadId_localId: Reference to Lead's _localId (if lead)
+- ContactId_localId: Reference to Contact's _localId (if contact, mutually exclusive with LeadId)
+- _localId: Unique identifier (e.g., "CampaignMember_1")
+
+Link either Leads OR Contacts to Campaigns, not both for the same member.`,
 
   [SalesforceObject.TASK]: `${BASE_SYSTEM_PROMPT}Generate Task (activity) records with these fields:
 - Subject: Action-oriented task name
@@ -100,7 +160,7 @@ Create realistic meeting scenarios (discovery calls, demos, contract reviews).`,
 - TextBody: Full email content
 - ToAddress, FromAddress: Use demo-safe domains
 - MessageDate: ISO 8601 timestamp
-- RelatedToId_localId: Reference to related Opportunity's _localId
+- ParentId_localId: Reference to related Opportunity's _localId
 - _localId: Unique identifier
 
 All emails must be fictional and demo-safe.`,

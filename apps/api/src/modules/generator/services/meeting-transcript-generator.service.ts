@@ -416,10 +416,19 @@ Return as JSON with this structure:
 
     const participantNames = config.participants.map((p) => p.name).join(', ');
 
+    const transcriptText = this.truncateTranscript(transcript.transcript, 30000);
+    const transcriptBlock = transcriptText
+      ? `\n\n--- TRANSCRIPT ---\n${transcriptText}`
+      : '';
+
     return {
       _localId: `Event_${Date.now()}`,
       Subject: `${this.getMeetingTypeLabel(config.type)} - ${config.participants.find((p) => p.role === 'attendee')?.company || 'Meeting'}`,
-      Description: `${transcript.summary}\n\n**Key Points:**\n${transcript.keyPoints.map((p) => `• ${p}`).join('\n')}\n\n**Next Steps:**\n${transcript.nextSteps.map((s) => `• ${s}`).join('\n')}\n\n**Participants:** ${participantNames}\n\n**Engagement Score:** ${transcript.engagementScore}/100\n\n---\nFull transcript available in meeting notes.`,
+      Description: `${transcript.summary}\n\n**Key Points:**\n${transcript.keyPoints
+        .map((p) => `• ${p}`)
+        .join('\n')}\n\n**Next Steps:**\n${transcript.nextSteps
+        .map((s) => `• ${s}`)
+        .join('\n')}\n\n**Participants:** ${participantNames}\n\n**Engagement Score:** ${transcript.engagementScore}/100${transcriptBlock}`,
       StartDateTime: startDateTime.toISOString(),
       EndDateTime: endDateTime.toISOString(),
       Type: 'Meeting',
@@ -432,6 +441,16 @@ Return as JSON with this structure:
       _meetingEngagementScore: transcript.engagementScore,
       _meetingActionItems: transcript.actionItems,
     };
+  }
+
+  private truncateTranscript(text: string, maxLength: number): string {
+    if (!text) {
+      return '';
+    }
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
   }
 
   private getMeetingTypeLabel(type: MeetingConfig['type']): string {

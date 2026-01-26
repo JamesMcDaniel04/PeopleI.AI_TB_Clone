@@ -315,7 +315,7 @@ Distribute activities across contacts realistically.
     if (objectType === 'EmailMessage' && existingRecords.has('Opportunity')) {
       const opportunities = existingRecords.get('Opportunity')!;
 
-      return `Link these email messages to opportunities (RelatedToId_localId):
+      return `Link these email messages to opportunities (ParentId_localId):
 
 Opportunities:
 ${JSON.stringify(opportunities.map((o) => ({ _localId: o._localId, Name: o.Name })), null, 2)}
@@ -488,13 +488,13 @@ Ensure each record has a unique _localId for tracking.`;
       case 'EmailMessage':
         return {
           ...base,
-          required: ['Subject', 'TextBody', 'RelatedToId_localId'],
+          required: ['Subject', 'TextBody', 'ParentId_localId'],
           properties: {
             Subject: { type: 'string' },
             TextBody: { type: 'string' },
             FromAddress: { type: 'string' },
             ToAddress: { type: 'string' },
-            RelatedToId_localId: { type: 'string' },
+            ParentId_localId: { type: 'string' },
           },
         };
       case 'Lead':

@@ -67,10 +67,15 @@ export class Template {
     defaultRecordCounts?: {
       Account?: number;
       Contact?: number;
+      Lead?: number;
       Opportunity?: number;
+      Case?: number;
+      Campaign?: number;
+      CampaignMember?: number;
       Task?: number;
       Event?: number;
       EmailMessage?: number;
+      [key: string]: number | undefined;
     };
     scenarios?: string[];
   };
