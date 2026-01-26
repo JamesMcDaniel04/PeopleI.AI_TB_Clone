@@ -15,6 +15,7 @@ import { DatasetsModule } from './modules/datasets/datasets.module';
 import { SalesforceModule } from './modules/salesforce/salesforce.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { HealthModule } from './modules/health/health.module';
+import { SnapshotsModule } from './modules/snapshots/snapshots.module';
 
 import configuration from './config/configuration';
 
@@ -92,6 +93,7 @@ import configuration from './config/configuration';
     SalesforceModule,
     JobsModule.register({ controllers: true, processors: false }),
     HealthModule,
+    SnapshotsModule,
   ],
   providers: [
     {

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './services/openai.service';
 import { PromptBuilderService } from './services/prompt-builder.service';
 import { DataTransformerService } from './services/data-transformer.service';
+import { TemporalSchedulerService, TemporalConfig } from './services/temporal-scheduler.service';
 import { TemplatesService } from '../templates/templates.service';
 import { DatasetsService } from '../datasets/datasets.service';
 import { QueueService } from '../jobs/services/queue.service';
@@ -17,6 +18,7 @@ export class GeneratorService {
     private openaiService: OpenAIService,
     private promptBuilder: PromptBuilderService,
     private dataTransformer: DataTransformerService,
+    private temporalScheduler: TemporalSchedulerService,
     private templatesService: TemplatesService,
     private datasetsService: DatasetsService,
     private queueService: QueueService,

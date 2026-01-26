@@ -1,14 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { TemporalSchedulerService, ActivitySlot } from './temporal-scheduler.service';
 
 interface GeneratedRecord {
   _localId?: string;
-  _parentLocalId?: string;
+  _parentLocalId?: string | null;
   [key: string]: any;
+}
+
+export interface TemporalRealism {
+  enabled: boolean;
+  startDate?: Date;
+  endDate?: Date;
+  pattern?: 'uniform' | 'front-loaded' | 'back-loaded' | 'bell-curve';
 }
 
 @Injectable()
 export class DataTransformerService {
   private readonly logger = new Logger(DataTransformerService.name);
+
+  constructor(private temporalScheduler?: TemporalSchedulerService) {}
 
   transformToSalesforceFormat(
     gptResponse: { records: GeneratedRecord[] },
@@ -466,5 +476,253 @@ export class DataTransformerService {
       // Custom tracking
       _callDuration: callData.duration,
     };
+  }
+
+  /**
+   * Apply temporal realism to a set of activity records (Tasks, Events, EmailMessages)
+   * Distributes activities across a realistic date range instead of all on the same day
+   */
+  applyTemporalRealism(
+    records: GeneratedRecord[],
+    objectType: string,
+    opportunities: Array<{ localId: string; stageName: string; closeDate: string }>,
+    config?: TemporalRealism,
+  ): GeneratedRecord[] {
+    if (!config?.enabled || !this.temporalScheduler) {
+      return records;
+    }
+
+    const activityTypes = ['Task', 'Event', 'EmailMessage'];
+    if (!activityTypes.includes(objectType)) {
+      return records;
+    }
+
+    // Group records by their related opportunity
+    const recordsByOpportunity = new Map<string, GeneratedRecord[]>();
+    const unlinkedRecords: GeneratedRecord[] = [];
+
+    for (const record of records) {
+      const oppLocalId = record.WhatId_localId || record.RelatedToId_localId;
+      if (oppLocalId) {
+        const existing = recordsByOpportunity.get(oppLocalId) || [];
+        existing.push(record);
+        recordsByOpportunity.set(oppLocalId, existing);
+      } else {
+        unlinkedRecords.push(record);
+      }
+    }
+
+    // Generate timelines for each opportunity
+    const opportunityTimelines = this.temporalScheduler.generateOpportunityActivityTimeline(
+      opportunities,
+      Math.max(...Array.from(recordsByOpportunity.values()).map((r) => r.length), 5),
+      {
+        startDate: config.startDate,
+        endDate: config.endDate,
+        densityPattern: config.pattern || 'bell-curve',
+      },
+    );
+
+    // Apply temporal slots to records
+    const updatedRecords: GeneratedRecord[] = [];
+
+    for (const [oppLocalId, oppRecords] of recordsByOpportunity) {
+      const slots = opportunityTimelines.get(oppLocalId) || [];
+
+      oppRecords.forEach((record, index) => {
+        const slot = slots[index % slots.length];
+        if (slot) {
+          updatedRecords.push(this.applySlotToRecord(record, objectType, slot));
+        } else {
+          updatedRecords.push(record);
+        }
+      });
+    }
+
+    // Handle unlinked records with general past distribution
+    if (unlinkedRecords.length > 0) {
+      const generalSlots = this.temporalScheduler.generatePastActivityDates(
+        unlinkedRecords.length,
+        60, // 60 days back
+        { densityPattern: config.pattern || 'bell-curve' },
+      );
+
+      unlinkedRecords.forEach((record, index) => {
+        const slot = generalSlots[index];
+        if (slot) {
+          updatedRecords.push(this.applySlotToRecord(record, objectType, slot));
+        } else {
+          updatedRecords.push(record);
+        }
+      });
+    }
+
+    return updatedRecords;
+  }
+
+  /**
+   * Apply a temporal slot to a specific record
+   */
+  private applySlotToRecord(
+    record: GeneratedRecord,
+    objectType: string,
+    slot: ActivitySlot,
+  ): GeneratedRecord {
+    const updated = { ...record };
+
+    switch (objectType) {
+      case 'Task':
+        updated.ActivityDate = slot.dateString;
+        // Mark past tasks as completed
+        if (slot.date < new Date()) {
+          updated.Status = 'Completed';
+        }
+        break;
+
+      case 'Event':
+        updated.StartDateTime = slot.dateTimeString;
+        // Calculate end time (30-60 minutes after start)
+        const endTime = new Date(slot.date);
+        endTime.setMinutes(endTime.getMinutes() + 30 + Math.floor(Math.random() * 30));
+        updated.EndDateTime = endTime.toISOString();
+        break;
+
+      case 'EmailMessage':
+        updated.MessageDate = slot.dateTimeString;
+        break;
+    }
+
+    return updated;
+  }
+
+  /**
+   * Generate a realistic email thread with proper response timing
+   */
+  generateRealisticEmailThread(
+    emails: Array<{ subject: string; body: string; direction: string }>,
+    contactEmail: string,
+    salesRepEmail: string,
+    opportunityLocalId: string,
+    threadStartDate?: Date,
+  ): GeneratedRecord[] {
+    if (!this.temporalScheduler) {
+      // Fallback to basic generation without temporal scheduling
+      return this.generateEmailRecords(
+        emails.map((e) => ({ ...e, timestamp: new Date().toISOString() })),
+        contactEmail,
+        salesRepEmail,
+        opportunityLocalId,
+      );
+    }
+
+    const startDate = threadStartDate || new Date(Date.now() - 14 * 24 * 60 * 60 * 1000); // 14 days ago
+    const timestamps = this.temporalScheduler.generateEmailThreadTimestamps(
+      emails.length,
+      startDate,
+      {
+        minResponseDelayHours: 4,
+        maxResponseDelayHours: 72,
+        businessHoursOnly: true,
+      },
+    );
+
+    const sanitizedContactEmail = this.sanitizeEmail(contactEmail);
+    const sanitizedRepEmail = this.sanitizeEmail(salesRepEmail);
+
+    return emails.map((email, index) => {
+      const direction = (email.direction || '').toLowerCase();
+      const isInbound = direction === 'inbound';
+      const timestamp = timestamps[index];
+
+      return {
+        _localId: `EmailMessage_${Date.now()}_${index}`,
+        Subject: email.subject || `Re: Follow up`,
+        TextBody: email.body || 'Email content',
+        FromAddress: isInbound ? sanitizedContactEmail : sanitizedRepEmail,
+        ToAddress: isInbound ? sanitizedRepEmail : sanitizedContactEmail,
+        MessageDate: timestamp.toISOString(),
+        Incoming: isInbound,
+        RelatedToId_localId: opportunityLocalId,
+      };
+    });
+  }
+
+  /**
+   * Generate activities with proper sales cycle timing
+   * Activities are distributed based on opportunity stage and close date
+   */
+  generateSalesCycleActivities(
+    opportunity: { localId: string; stageName: string; closeDate: string; name: string },
+    contact: { localId: string; firstName: string; lastName: string },
+    config: {
+      taskCount?: number;
+      eventCount?: number;
+      emailCount?: number;
+    },
+  ): { tasks: GeneratedRecord[]; events: GeneratedRecord[]; emails: GeneratedRecord[] } {
+    if (!this.temporalScheduler) {
+      return { tasks: [], events: [], emails: [] };
+    }
+
+    const closeDate = new Date(opportunity.closeDate);
+    const { startDate, endDate } = this.temporalScheduler.generateSalesCycleDates(
+      closeDate,
+      opportunity.stageName,
+    );
+
+    const tasks: GeneratedRecord[] = [];
+    const events: GeneratedRecord[] = [];
+    const emails: GeneratedRecord[] = [];
+
+    // Generate tasks
+    const taskCount = config.taskCount || 5;
+    const taskSlots = this.temporalScheduler.generateActivitySlots(taskCount, {
+      startDate,
+      endDate,
+      densityPattern: 'bell-curve',
+    });
+
+    const taskTypes = ['Follow-up', 'Send Information', 'Prepare Proposal', 'Internal Review', 'Contract Review'];
+
+    taskSlots.forEach((slot, index) => {
+      const isPast = slot.date < new Date();
+      tasks.push({
+        _localId: `Task_${Date.now()}_${index}`,
+        Subject: `${taskTypes[index % taskTypes.length]} - ${opportunity.name}`,
+        Status: isPast ? 'Completed' : 'Not Started',
+        Priority: index < 2 ? 'High' : 'Normal',
+        ActivityDate: slot.dateString,
+        Description: `Task related to ${opportunity.name} opportunity`,
+        Type: 'Other',
+        WhoId_localId: contact.localId,
+        WhatId_localId: opportunity.localId,
+      });
+    });
+
+    // Generate events (meetings)
+    const eventCount = config.eventCount || 3;
+    const eventSlots = this.temporalScheduler.generateMeetingSlots(eventCount, 45, {
+      startDate,
+      endDate,
+      densityPattern: 'front-loaded', // More meetings early in the cycle
+    });
+
+    const eventTypes = ['Discovery Call', 'Product Demo', 'Technical Review', 'Contract Negotiation', 'Executive Briefing'];
+
+    eventSlots.forEach((slot, index) => {
+      events.push({
+        _localId: `Event_${Date.now()}_${index}`,
+        Subject: `${eventTypes[index % eventTypes.length]} - ${contact.firstName} ${contact.lastName}`,
+        StartDateTime: slot.startDateTime,
+        EndDateTime: slot.endDateTime,
+        Location: 'Virtual (Zoom)',
+        Description: `Meeting with ${contact.firstName} ${contact.lastName} regarding ${opportunity.name}`,
+        Type: 'Meeting',
+        WhoId_localId: contact.localId,
+        WhatId_localId: opportunity.localId,
+      });
+    });
+
+    return { tasks, events, emails };
   }
 }

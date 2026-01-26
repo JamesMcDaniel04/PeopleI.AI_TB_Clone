@@ -24,7 +24,11 @@ interface GenerationConfig {
   recordCounts: {
     Account: number;
     Contact: number;
+    Lead: number;
     Opportunity: number;
+    Case: number;
+    Campaign: number;
+    CampaignMember: number;
     Task: number;
     Event: number;
     EmailMessage: number;
@@ -41,7 +45,11 @@ export default function GeneratePage() {
     recordCounts: {
       Account: 5,
       Contact: 15,
+      Lead: 10,
       Opportunity: 8,
+      Case: 5,
+      Campaign: 3,
+      CampaignMember: 20,
       Task: 20,
       Event: 10,
       EmailMessage: 10,
@@ -259,14 +267,14 @@ export default function GeneratePage() {
             </div>
 
             <div className="space-y-4">
-              {(['Account', 'Contact', 'Opportunity', 'Task', 'Event', 'EmailMessage'] as const).map(
+              {(['Account', 'Contact', 'Lead', 'Opportunity', 'Case', 'Campaign', 'CampaignMember', 'Task', 'Event', 'EmailMessage'] as const).map(
                 (objectType) => (
                   <div
                     key={objectType}
                     className="flex items-center justify-between py-3 border-b"
                   >
                     <div>
-                      <span className="font-medium text-gray-900">{objectType}s</span>
+                      <span className="font-medium text-gray-900">{getObjectLabel(objectType)}</span>
                       <span className="text-sm text-gray-500 ml-2">
                         {getObjectDescription(objectType)}
                       </span>
@@ -274,7 +282,7 @@ export default function GeneratePage() {
                     <input
                       type="number"
                       min="0"
-                      max={objectType === 'Account' ? 100 : 500}
+                      max={getObjectMax(objectType)}
                       value={config.recordCounts?.[objectType] || 0}
                       onChange={(e) =>
                         setConfig({
@@ -417,14 +425,50 @@ export default function GeneratePage() {
   );
 }
 
+function getObjectLabel(objectType: string): string {
+  const labels: Record<string, string> = {
+    Account: 'Accounts',
+    Contact: 'Contacts',
+    Lead: 'Leads',
+    Opportunity: 'Opportunities',
+    Case: 'Cases',
+    Campaign: 'Campaigns',
+    CampaignMember: 'Campaign Members',
+    Task: 'Tasks',
+    Event: 'Events',
+    EmailMessage: 'Email Messages',
+  };
+  return labels[objectType] || `${objectType}s`;
+}
+
 function getObjectDescription(objectType: string): string {
   const descriptions: Record<string, string> = {
     Account: 'Companies',
     Contact: 'People at companies',
+    Lead: 'Prospective customers',
     Opportunity: 'Deals/Sales',
+    Case: 'Support tickets',
+    Campaign: 'Marketing campaigns',
+    CampaignMember: 'Campaign participants',
     Task: 'Activities & calls',
     Event: 'Meetings',
     EmailMessage: 'Email threads',
   };
   return descriptions[objectType] || '';
+}
+
+function getObjectMax(objectType: string): number {
+  const maxValues: Record<string, number> = {
+    Account: 100,
+    Contact: 500,
+    Lead: 200,
+    Opportunity: 100,
+    Case: 100,
+    Campaign: 50,
+    CampaignMember: 500,
+    Task: 500,
+    Event: 200,
+    EmailMessage: 200,
+  };
+  return maxValues[objectType] || 100;
 }
