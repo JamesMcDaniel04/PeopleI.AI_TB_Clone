@@ -28,12 +28,16 @@ export class InjectionProcessor extends WorkerHost {
   }
 
   async process(job: Job<InjectionJobData>): Promise<{ successful: number; failed: number; total: number }> {
-    const { datasetId, environmentId } = job.data;
+    const { datasetId, environmentId, userId } = job.data;
+    const queueJobId = String(job.id);
     this.logger.log(`Starting injection job ${job.id} for dataset ${datasetId}`);
 
     try {
       await job.updateProgress(0);
-      const queueJobId = String(job.id);
+
+      // Emit initial progress via WebSocket
+      this.emitProgress(userId, datasetId, queueJobId, 'running', 0, 'Starting injection...');
+
       const ensureNotCancelled = async () => {
         const current = await this.jobsService.findByQueue('injection', queueJobId);
         if (current?.status === JobStatus.CANCELLED) {
@@ -49,7 +53,7 @@ export class InjectionProcessor extends WorkerHost {
       try {
         await this.snapshotsService.createPreInjectionSnapshot(
           environmentId,
-          job.data.userId,
+          userId,
           dataset.name,
         );
       } catch (snapshotError: any) {
@@ -83,6 +87,8 @@ export class InjectionProcessor extends WorkerHost {
             }
             const progress = Math.min(95, Math.floor((processed / total) * 100));
             await job.updateProgress(progress);
+            // Emit progress via WebSocket
+            this.emitProgress(userId, datasetId, queueJobId, 'running', progress, `Injecting records... ${processed}/${total}`);
           },
         },
       );
@@ -128,6 +134,17 @@ export class InjectionProcessor extends WorkerHost {
 
       await job.updateProgress(100);
 
+      // Emit completion via WebSocket
+      this.eventsGateway.emitJobCompleted(userId, {
+        jobId: queueJobId,
+        datasetId,
+        type: 'injection',
+        status: 'completed',
+        progress: 100,
+        message: `Injection completed: ${result.summary.successful} success, ${result.summary.failed} failed`,
+        recordCounts: { successful: result.summary.successful, failed: result.summary.failed },
+      });
+
       this.eventEmitter.emit('injection.completed', {
         datasetId,
         jobId: job.id,
@@ -140,9 +157,39 @@ export class InjectionProcessor extends WorkerHost {
       return result.summary;
     } catch (error: any) {
       this.logger.error(`Injection failed for dataset ${datasetId}: ${error.message}`);
+
+      // Emit failure via WebSocket
+      this.eventsGateway.emitJobFailed(userId, {
+        jobId: queueJobId,
+        datasetId,
+        type: 'injection',
+        status: 'failed',
+        progress: 0,
+        message: 'Injection failed',
+        error: error.message,
+      });
+
       await this.datasetsService.updateStatus(datasetId, DatasetStatus.FAILED, error.message);
       throw error;
     }
+  }
+
+  private emitProgress(
+    userId: string,
+    datasetId: string,
+    jobId: string,
+    status: 'pending' | 'running' | 'completed' | 'failed',
+    progress: number,
+    message?: string,
+  ) {
+    this.eventsGateway.emitJobProgress(userId, {
+      jobId,
+      datasetId,
+      type: 'injection',
+      status,
+      progress,
+      message,
+    });
   }
 
   @OnWorkerEvent('active')

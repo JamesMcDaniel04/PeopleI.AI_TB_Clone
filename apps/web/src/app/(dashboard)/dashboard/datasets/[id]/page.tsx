@@ -19,7 +19,10 @@ import {
   PhoneCall,
   FileText,
   Download,
+  Eye,
 } from 'lucide-react';
+import { DataPreviewModal } from '@/components/data-preview/DataPreviewModal';
+import { useDatasetProgress } from '@/hooks/useWebSocket';
 
 export default function DatasetDetailPage() {
   const params = useParams();
@@ -38,6 +41,7 @@ export default function DatasetDetailPage() {
   const [callError, setCallError] = useState<string | null>(null);
   const [meetingError, setMeetingError] = useState<string | null>(null);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const { data: dataset, isLoading } = useQuery({
     queryKey: ['dataset', datasetId],
@@ -70,6 +74,11 @@ export default function DatasetDetailPage() {
     queryFn: () => api.jobs.list({ datasetId, limit: 10 }).then((res) => res.data.data),
     enabled: !!dataset,
   });
+
+  // WebSocket progress tracking for real-time updates
+  const { progress: wsProgress } = useDatasetProgress(
+    dataset?.status === 'generating' || dataset?.status === 'injecting' ? datasetId : null
+  );
 
   const injectMutation = useMutation({
     mutationFn: () => api.generator.inject(datasetId),
@@ -257,18 +266,27 @@ export default function DatasetDetailPage() {
           </button>
 
           {dataset.status === 'generated' && dataset.environmentId && (
-            <button
-              onClick={() => injectMutation.mutate()}
-              disabled={injectMutation.isPending}
-              className="btn btn-primary btn-md"
-            >
-              {injectMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="mr-2 h-4 w-4" />
-              )}
-              Inject to Salesforce
-            </button>
+            <>
+              <button
+                onClick={() => setShowPreviewModal(true)}
+                className="btn btn-outline btn-md"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Preview Data
+              </button>
+              <button
+                onClick={() => injectMutation.mutate()}
+                disabled={injectMutation.isPending}
+                className="btn btn-primary btn-md"
+              >
+                {injectMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}
+                Inject to Salesforce
+              </button>
+            </>
           )}
 
           {dataset.status === 'completed' && (
@@ -723,6 +741,52 @@ export default function DatasetDetailPage() {
           </div>
         </div>
       )}
+
+      {/* WebSocket real-time progress indicator */}
+      {wsProgress && (dataset?.status === 'generating' || dataset?.status === 'injecting') && (
+        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border max-w-sm">
+          <div className="flex items-center mb-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary-600 mr-2" />
+            <span className="text-sm font-medium text-gray-900">
+              {wsProgress.type === 'generation' ? 'Generating' : 'Injecting'} Data
+            </span>
+          </div>
+          <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden mb-1">
+            <div
+              className="h-full bg-primary-600 transition-all duration-300"
+              style={{ width: `${wsProgress.progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            {wsProgress.message || `${wsProgress.progress}% complete`}
+          </p>
+          {wsProgress.currentObject && (
+            <p className="text-xs text-gray-400 mt-1">
+              Processing: {wsProgress.currentObject}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Data Preview Modal */}
+      <DataPreviewModal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onConfirm={() => {
+          setShowPreviewModal(false);
+          injectMutation.mutate();
+        }}
+        records={records?.map((r: any) => ({
+          id: r.id,
+          localId: r.localId,
+          salesforceObject: r.salesforceObject,
+          data: r.data,
+          parentLocalId: r.parentLocalId,
+        })) || []}
+        datasetName={dataset?.name || 'Dataset'}
+        environmentName={dataset?.environment?.name}
+        isLoading={injectMutation.isPending}
+      />
     </div>
   );
 }
