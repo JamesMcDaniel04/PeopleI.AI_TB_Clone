@@ -10,6 +10,7 @@ import { InjectionJobData } from '../services/queue.service';
 import { JobsService } from '../jobs.service';
 import { JobStatus } from '../entities/job.entity';
 import { SnapshotsService } from '../../snapshots/snapshots.service';
+import { EventsGateway } from '../../websocket/events.gateway';
 
 @Processor('injection')
 export class InjectionProcessor extends WorkerHost {
@@ -21,6 +22,7 @@ export class InjectionProcessor extends WorkerHost {
     private eventEmitter: EventEmitter2,
     private jobsService: JobsService,
     private snapshotsService: SnapshotsService,
+    private eventsGateway: EventsGateway,
   ) {
     super();
   }

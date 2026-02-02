@@ -16,6 +16,7 @@ import { SalesforceModule } from './modules/salesforce/salesforce.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { HealthModule } from './modules/health/health.module';
 import { SnapshotsModule } from './modules/snapshots/snapshots.module';
+import { WebsocketModule } from './modules/websocket/websocket.module';
 
 import configuration from './config/configuration';
 
@@ -94,6 +95,7 @@ import configuration from './config/configuration';
     JobsModule.register({ controllers: true, processors: false }),
     HealthModule,
     SnapshotsModule,
+    WebsocketModule,
   ],
   providers: [
     {
