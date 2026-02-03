@@ -6,13 +6,16 @@ import {
   UseGuards,
   Query,
   Post,
+  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { DatasetsService } from './datasets.service';
 import { QueueService } from '../jobs/services/queue.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('datasets')
 @Controller('datasets')
@@ -27,26 +30,27 @@ export class DatasetsController {
   @Get()
   @ApiOperation({ summary: 'List all datasets for current user' })
   @ApiResponse({ status: 200, description: 'Datasets retrieved' })
-  async findAll(@CurrentUser() user: User) {
-    const datasets = await this.datasetsService.findAll(user.id);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findAll(@CurrentUser() user: User, @Query() pagination: PaginationDto) {
+    const result = await this.datasetsService.findAllPaginated(user.id, pagination);
     return {
       success: true,
-      data: datasets,
+      data: result.data,
+      meta: result.meta,
     };
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get dataset by ID' })
   @ApiResponse({ status: 200, description: 'Dataset retrieved' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   @ApiResponse({ status: 404, description: 'Dataset not found' })
   async findOne(@Param('id') id: string, @CurrentUser() user: User) {
     const dataset = await this.datasetsService.findById(id);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     const recordCounts = await this.datasetsService.getRecordCounts(id);
@@ -63,27 +67,28 @@ export class DatasetsController {
   @Get(':id/records')
   @ApiOperation({ summary: 'Get dataset records' })
   @ApiResponse({ status: 200, description: 'Records retrieved' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiQuery({ name: 'objectType', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   async getRecords(
     @Param('id') id: string,
     @Query('objectType') objectType: string,
+    @Query() pagination: PaginationDto,
     @CurrentUser() user: User,
   ) {
     const dataset = await this.datasetsService.findById(id);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
-    const records = objectType
-      ? await this.datasetsService.getRecordsByObject(id, objectType)
-      : await this.datasetsService.getRecords(id);
+    const result = await this.datasetsService.getRecordsPaginated(id, objectType, pagination);
 
     return {
       success: true,
-      data: records,
+      data: result.data,
+      meta: result.meta,
     };
   }
 
@@ -102,21 +107,17 @@ export class DatasetsController {
   @Post(':id/cleanup')
   @ApiOperation({ summary: 'Remove injected records from Salesforce' })
   @ApiResponse({ status: 200, description: 'Cleanup completed' })
+  @ApiResponse({ status: 400, description: 'No environment linked' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async cleanup(@Param('id') id: string, @CurrentUser() user: User) {
     const dataset = await this.datasetsService.findById(id);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     if (!dataset.environmentId) {
-      return {
-        success: false,
-        error: 'No Salesforce environment linked to this dataset',
-      };
+      throw new BadRequestException('No Salesforce environment linked to this dataset');
     }
 
     const injectedRecords = await this.datasetsService.getInjectedRecords(id);
@@ -146,14 +147,12 @@ export class DatasetsController {
   @Get(':id/export')
   @ApiOperation({ summary: 'Export dataset as JSON' })
   @ApiResponse({ status: 200, description: 'Dataset exported' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async export(@Param('id') id: string, @CurrentUser() user: User) {
     const dataset = await this.datasetsService.findById(id);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     const records = await this.datasetsService.getRecords(id);

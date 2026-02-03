@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Dataset, DatasetStatus } from './entities/dataset.entity';
 import { DatasetRecord, RecordStatus } from './entities/dataset-record.entity';
+import { PaginationDto, PaginatedResult, paginate } from '../../common/dto/pagination.dto';
 
 interface CreateDatasetData {
   userId: string;
@@ -36,6 +37,21 @@ export class DatasetsService {
       order: { createdAt: 'DESC' },
       relations: ['template', 'environment'],
     });
+  }
+
+  async findAllPaginated(userId: string, pagination: PaginationDto): Promise<PaginatedResult<Dataset>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.datasetsRepository.findAndCount({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      relations: ['template', 'environment'],
+      skip,
+      take: limit,
+    });
+
+    return paginate(data, total, page, limit);
   }
 
   async findById(id: string): Promise<Dataset> {
@@ -114,6 +130,29 @@ export class DatasetsService {
       where: { datasetId, salesforceObject: objectType },
       order: { createdAt: 'ASC' },
     });
+  }
+
+  async getRecordsPaginated(
+    datasetId: string,
+    objectType: string | undefined,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<DatasetRecord>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const where: any = { datasetId };
+    if (objectType) {
+      where.salesforceObject = objectType;
+    }
+
+    const [data, total] = await this.recordsRepository.findAndCount({
+      where,
+      order: { createdAt: 'ASC' },
+      skip,
+      take: limit,
+    });
+
+    return paginate(data, total, page, limit);
   }
 
   async getRecordCounts(datasetId: string): Promise<Record<string, number>> {
