@@ -5,6 +5,8 @@ import {
   Body,
   Param,
   UseGuards,
+  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { GeneratorService } from './generator.service';
@@ -14,6 +16,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { GenerateDataDto } from './dto/generate-data.dto';
+import { GenerateEmailsDto } from './dto/generate-emails.dto';
+import { GenerateCallDto } from './dto/generate-call.dto';
+import { GenerateMeetingDto, MeetingType } from './dto/generate-meeting.dto';
 import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('generator')
@@ -49,18 +54,15 @@ export class GeneratorController {
   @Get(':datasetId/status')
   @ApiOperation({ summary: 'Get generation job status' })
   @ApiResponse({ status: 200, description: 'Job status retrieved' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async getStatus(
     @Param('datasetId') datasetId: string,
     @CurrentUser() user: User,
   ) {
     const dataset = await this.datasetsService.findById(datasetId);
 
-    // Verify ownership
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     const recordCounts = await this.datasetsService.getRecordCounts(datasetId);
@@ -84,25 +86,20 @@ export class GeneratorController {
   @Post(':datasetId/inject')
   @ApiOperation({ summary: 'Inject generated data into Salesforce' })
   @ApiResponse({ status: 200, description: 'Injection job started' })
+  @ApiResponse({ status: 400, description: 'No environment linked' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async injectData(
     @Param('datasetId') datasetId: string,
     @CurrentUser() user: User,
   ) {
     const dataset = await this.datasetsService.findById(datasetId);
 
-    // Verify ownership
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     if (!dataset.environmentId) {
-      return {
-        success: false,
-        error: 'No Salesforce environment linked to this dataset',
-      };
+      throw new BadRequestException('No Salesforce environment linked to this dataset');
     }
 
     // Queue injection job
@@ -123,25 +120,23 @@ export class GeneratorController {
   @Post(':datasetId/emails/:opportunityLocalId')
   @ApiOperation({ summary: 'Generate email thread for an opportunity' })
   @ApiResponse({ status: 200, description: 'Emails generated' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async generateEmails(
     @Param('datasetId') datasetId: string,
     @Param('opportunityLocalId') opportunityLocalId: string,
-    @Body() body: { emailCount?: number },
+    @Body() dto: GenerateEmailsDto,
     @CurrentUser() user: User,
   ) {
     const dataset = await this.datasetsService.findById(datasetId);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     await this.generatorService.generateEmailsForOpportunity(
       datasetId,
       opportunityLocalId,
-      body.emailCount || 3,
+      dto.emailCount || 3,
     );
 
     return {
@@ -153,26 +148,24 @@ export class GeneratorController {
   @Post(':datasetId/calls/:opportunityLocalId')
   @ApiOperation({ summary: 'Generate call transcript for an opportunity' })
   @ApiResponse({ status: 200, description: 'Call transcript generated' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async generateCallTranscript(
     @Param('datasetId') datasetId: string,
     @Param('opportunityLocalId') opportunityLocalId: string,
-    @Body() body: { callType?: string; duration?: number },
+    @Body() dto: GenerateCallDto,
     @CurrentUser() user: User,
   ) {
     const dataset = await this.datasetsService.findById(datasetId);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     await this.generatorService.generateCallTranscript(
       datasetId,
       opportunityLocalId,
-      body.callType || 'Discovery Call',
-      body.duration || 30,
+      dto.callType || 'Discovery Call',
+      dto.duration || 30,
     );
 
     return {
@@ -184,26 +177,24 @@ export class GeneratorController {
   @Post(':datasetId/meetings/:opportunityLocalId')
   @ApiOperation({ summary: 'Generate meeting transcript for an opportunity' })
   @ApiResponse({ status: 200, description: 'Meeting transcript generated' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
   async generateMeetingTranscript(
     @Param('datasetId') datasetId: string,
     @Param('opportunityLocalId') opportunityLocalId: string,
-    @Body() body: { meetingType?: string; duration?: number },
+    @Body() dto: GenerateMeetingDto,
     @CurrentUser() user: User,
   ) {
     const dataset = await this.datasetsService.findById(datasetId);
 
     if (dataset.userId !== user.id) {
-      return {
-        success: false,
-        error: 'Access denied',
-      };
+      throw new ForbiddenException('Access denied');
     }
 
     await this.generatorService.generateMeetingTranscript(
       datasetId,
       opportunityLocalId,
-      (body.meetingType as any) || 'demo',
-      body.duration || 45,
+      dto.meetingType || MeetingType.DEMO,
+      dto.duration || 45,
     );
 
     return {

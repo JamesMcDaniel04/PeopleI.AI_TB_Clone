@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Job, JobStatus, JobType } from './entities/job.entity';
+import { PaginationDto, PaginatedResult, paginate } from '../../common/dto/pagination.dto';
 
 interface CreateJobInput {
   type: JobType;
@@ -148,6 +149,36 @@ export class JobsService {
     return query.getMany();
   }
 
+  async findForUserPaginated(
+    userId: string,
+    pagination: PaginationDto,
+    filters?: { datasetId?: string; type?: JobType; status?: JobStatus },
+  ): Promise<PaginatedResult<Job>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const query = this.jobsRepository
+      .createQueryBuilder('job')
+      .where('job.userId = :userId', { userId })
+      .orderBy('job.createdAt', 'DESC');
+
+    if (filters?.datasetId) {
+      query.andWhere('job.datasetId = :datasetId', { datasetId: filters.datasetId });
+    }
+
+    if (filters?.type) {
+      query.andWhere('job.type = :type', { type: filters.type });
+    }
+
+    if (filters?.status) {
+      query.andWhere('job.status = :status', { status: filters.status });
+    }
+
+    const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+    return paginate(data, total, page, limit);
+  }
+
   async findAll(
     filters?: { datasetId?: string; userId?: string; type?: JobType; status?: JobStatus; limit?: number },
   ): Promise<Job[]> {
@@ -176,6 +207,38 @@ export class JobsService {
     }
 
     return query.getMany();
+  }
+
+  async findAllPaginated(
+    pagination: PaginationDto,
+    filters?: { datasetId?: string; userId?: string; type?: JobType; status?: JobStatus },
+  ): Promise<PaginatedResult<Job>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const query = this.jobsRepository
+      .createQueryBuilder('job')
+      .orderBy('job.createdAt', 'DESC');
+
+    if (filters?.datasetId) {
+      query.andWhere('job.datasetId = :datasetId', { datasetId: filters.datasetId });
+    }
+
+    if (filters?.userId) {
+      query.andWhere('job.userId = :userId', { userId: filters.userId });
+    }
+
+    if (filters?.type) {
+      query.andWhere('job.type = :type', { type: filters.type });
+    }
+
+    if (filters?.status) {
+      query.andWhere('job.status = :status', { status: filters.status });
+    }
+
+    const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+    return paginate(data, total, page, limit);
   }
 
   async deleteOlderThan(
