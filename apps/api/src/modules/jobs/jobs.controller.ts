@@ -9,7 +9,7 @@ import {
   Post,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
 import { JobStatus, JobType } from './entities/job.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,6 +18,7 @@ import { User } from '../users/entities/user.entity';
 import { QueueService } from './services/queue.service';
 import { DatasetsService } from '../datasets/datasets.service';
 import { DatasetStatus } from '../datasets/entities/dataset.entity';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('jobs')
 @Controller('jobs')
@@ -33,23 +34,28 @@ export class JobsController {
   @Get()
   @ApiOperation({ summary: 'List jobs for current user' })
   @ApiResponse({ status: 200, description: 'Jobs retrieved' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'datasetId', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, enum: JobType })
+  @ApiQuery({ name: 'status', required: false, enum: JobStatus })
   async list(
     @CurrentUser() user: User,
+    @Query() pagination: PaginationDto,
     @Query('datasetId') datasetId?: string,
     @Query('type') type?: JobType,
     @Query('status') status?: JobStatus,
-    @Query('limit') limit?: string,
   ) {
-    const jobs = await this.jobsService.findForUser(user.id, {
+    const result = await this.jobsService.findForUserPaginated(user.id, pagination, {
       datasetId,
       type,
       status,
-      limit: limit ? parseInt(limit, 10) : undefined,
     });
 
     return {
       success: true,
-      data: jobs,
+      data: result.data,
+      meta: result.meta,
     };
   }
 
