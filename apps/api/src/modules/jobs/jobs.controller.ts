@@ -62,29 +62,35 @@ export class JobsController {
   @Get('admin/all')
   @ApiOperation({ summary: 'Admin list of all jobs' })
   @ApiResponse({ status: 200, description: 'Jobs retrieved' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'datasetId', required: false, type: String })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, enum: JobType })
+  @ApiQuery({ name: 'status', required: false, enum: JobStatus })
   async listAll(
     @CurrentUser() user: User,
+    @Query() pagination: PaginationDto,
     @Query('datasetId') datasetId?: string,
     @Query('userId') userId?: string,
     @Query('type') type?: JobType,
     @Query('status') status?: JobStatus,
-    @Query('limit') limit?: string,
   ) {
     if (user.role !== 'admin') {
       throw new ForbiddenException('Access denied');
     }
 
-    const jobs = await this.jobsService.findAll({
+    const result = await this.jobsService.findAllPaginated(pagination, {
       datasetId,
       userId,
       type,
       status,
-      limit: limit ? parseInt(limit, 10) : undefined,
     });
 
     return {
       success: true,
-      data: jobs,
+      data: result.data,
+      meta: result.meta,
     };
   }
 

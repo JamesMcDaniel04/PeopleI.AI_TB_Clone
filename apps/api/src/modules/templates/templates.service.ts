@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Template, Industry, TemplateCategory } from './entities/template.entity';
 import { TemplatePrompt } from './entities/template-prompt.entity';
 import { DEFAULT_TEMPLATE_PROMPTS } from './default-prompts';
+import { PaginationDto, PaginatedResult, paginate } from '../../common/dto/pagination.dto';
 
 @Injectable()
 export class TemplatesService {
@@ -28,6 +29,30 @@ export class TemplatesService {
     }
 
     return queryBuilder.orderBy('template.name', 'ASC').getMany();
+  }
+
+  async findAllPaginated(userId: string | undefined, pagination: PaginationDto): Promise<PaginatedResult<Template>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.templatesRepository.createQueryBuilder('template');
+
+    if (userId) {
+      queryBuilder.where('template.isSystem = :isSystem OR template.userId = :userId', {
+        isSystem: true,
+        userId,
+      });
+    } else {
+      queryBuilder.where('template.isSystem = :isSystem', { isSystem: true });
+    }
+
+    const [data, total] = await queryBuilder
+      .orderBy('template.name', 'ASC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return paginate(data, total, page, limit);
   }
 
   async findById(id: string): Promise<Template> {

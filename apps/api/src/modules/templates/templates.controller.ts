@@ -8,8 +8,9 @@ import {
   Body,
   ForbiddenException,
   Put,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TemplatesService } from './templates.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -17,6 +18,7 @@ import { User, UserRole } from '../users/entities/user.entity';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { UpsertTemplatePromptsDto } from './dto/upsert-template-prompts.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('templates')
 @Controller('templates')
