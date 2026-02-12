@@ -5,6 +5,7 @@ import { Environment, EnvironmentStatus } from './entities/environment.entity';
 import { SalesforceCredential } from './entities/salesforce-credential.entity';
 import { CreateEnvironmentDto } from './dto/create-environment.dto';
 import { UpdateEnvironmentDto } from './dto/update-environment.dto';
+import { PaginationDto, PaginatedResult, paginate } from '../../common/dto/pagination.dto';
 
 @Injectable()
 export class EnvironmentsService {
@@ -20,6 +21,20 @@ export class EnvironmentsService {
       where: { userId },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findAllPaginated(userId: string, pagination: PaginationDto): Promise<PaginatedResult<Environment>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.environmentsRepository.findAndCount({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return paginate(data, total, page, limit);
   }
 
   async findById(id: string, userId: string): Promise<Environment> {

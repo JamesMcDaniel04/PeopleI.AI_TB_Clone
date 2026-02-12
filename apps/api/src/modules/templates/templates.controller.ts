@@ -30,11 +30,14 @@ export class TemplatesController {
   @Get()
   @ApiOperation({ summary: 'List all available templates' })
   @ApiResponse({ status: 200, description: 'Templates retrieved' })
-  async findAll(@CurrentUser() user: User) {
-    const templates = await this.templatesService.findAll(user.id);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findAll(@CurrentUser() user: User, @Query() pagination: PaginationDto) {
+    const result = await this.templatesService.findAllPaginated(user.id, pagination);
     return {
       success: true,
-      data: templates,
+      data: result.data,
+      meta: result.meta,
     };
   }
 
