@@ -10,7 +10,7 @@ import {
   Query,
   ParseBoolPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { EnvironmentsService } from './environments.service';
 import { SalesforceAuthService } from '../salesforce/services/salesforce-auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -19,6 +19,7 @@ import { User } from '../users/entities/user.entity';
 import { CreateEnvironmentDto } from './dto/create-environment.dto';
 import { UpdateEnvironmentDto } from './dto/update-environment.dto';
 import { SalesforceCallbackDto } from './dto/salesforce-callback.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('environments')
 @Controller('environments')
@@ -33,11 +34,14 @@ export class EnvironmentsController {
   @Get()
   @ApiOperation({ summary: 'List all environments for current user' })
   @ApiResponse({ status: 200, description: 'Environments retrieved' })
-  async findAll(@CurrentUser() user: User) {
-    const environments = await this.environmentsService.findAll(user.id);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findAll(@CurrentUser() user: User, @Query() pagination: PaginationDto) {
+    const result = await this.environmentsService.findAllPaginated(user.id, pagination);
     return {
       success: true,
-      data: environments,
+      data: result.data,
+      meta: result.meta,
     };
   }
 

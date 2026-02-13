@@ -6,22 +6,11 @@ import { SalesforceRestApiService } from '../salesforce/services/salesforce-rest
 import { SalesforceBulkApiService } from '../salesforce/services/salesforce-bulk-api.service';
 import { SalesforceObjectMapperService } from '../salesforce/services/salesforce-object-mapper.service';
 import { EnvironmentsService } from '../environments/environments.service';
+import { CreateSnapshotDto } from './dto/create-snapshot.dto';
+import { RestoreSnapshotDto } from './dto/restore-snapshot.dto';
+import { PaginationDto, PaginatedResult, paginate } from '../../common/dto/pagination.dto';
 
-export interface CreateSnapshotDto {
-  name: string;
-  description?: string;
-  environmentId: string;
-  type?: SnapshotType;
-  isGoldenImage?: boolean;
-  recordIds?: Record<string, string[]>;
-  tags?: string[];
-}
-
-export interface RestoreSnapshotOptions {
-  deleteExisting?: boolean;
-  objectTypes?: string[];
-  dryRun?: boolean;
-}
+export type RestoreSnapshotOptions = RestoreSnapshotDto;
 
 @Injectable()
 export class SnapshotsService {
@@ -455,6 +444,45 @@ export class SnapshotsService {
     }
 
     return query.getMany();
+  }
+
+  async findAllPaginated(
+    userId: string,
+    pagination: PaginationDto,
+    options?: {
+      environmentId?: string;
+      type?: SnapshotType;
+      isGoldenImage?: boolean;
+    },
+  ): Promise<PaginatedResult<Snapshot>> {
+    const { page = 1, limit = 20 } = pagination;
+    const skip = (page - 1) * limit;
+
+    const query = this.snapshotRepository
+      .createQueryBuilder('snapshot')
+      .where('snapshot.userId = :userId', { userId })
+      .leftJoinAndSelect('snapshot.environment', 'environment')
+      .orderBy('snapshot.createdAt', 'DESC');
+
+    if (options?.environmentId) {
+      query.andWhere('snapshot.environmentId = :environmentId', {
+        environmentId: options.environmentId,
+      });
+    }
+
+    if (options?.type) {
+      query.andWhere('snapshot.type = :type', { type: options.type });
+    }
+
+    if (options?.isGoldenImage !== undefined) {
+      query.andWhere('snapshot.isGoldenImage = :isGoldenImage', {
+        isGoldenImage: options.isGoldenImage,
+      });
+    }
+
+    const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+    return paginate(data, total, page, limit);
   }
 
   /**

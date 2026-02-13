@@ -5,15 +5,17 @@ import {
   Body,
   UseGuards,
   Param,
+  Query,
   ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -62,15 +64,17 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'Admin list of users' })
   @ApiResponse({ status: 200, description: 'Users retrieved' })
-  async listUsers(@CurrentUser() user: User) {
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async listUsers(@CurrentUser() user: User, @Query() pagination: PaginationDto) {
     if (user.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Access denied');
     }
 
-    const users = await this.usersService.findAll();
+    const result = await this.usersService.findAllPaginated(pagination);
     return {
       success: true,
-      data: users.map((u) => ({
+      data: result.data.map((u) => ({
         id: u.id,
         email: u.email,
         firstName: u.firstName,
@@ -79,6 +83,7 @@ export class UsersController {
         isActive: u.isActive,
         createdAt: u.createdAt,
       })),
+      meta: result.meta,
     };
   }
 

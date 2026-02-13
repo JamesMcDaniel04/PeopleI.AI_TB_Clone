@@ -12,8 +12,11 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { SnapshotsService, CreateSnapshotDto, RestoreSnapshotOptions } from './snapshots.service';
+import { SnapshotsService } from './snapshots.service';
+import { CreateSnapshotDto } from './dto/create-snapshot.dto';
+import { RestoreSnapshotDto } from './dto/restore-snapshot.dto';
 import { SnapshotType } from './entities/snapshot.entity';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('snapshots')
 @ApiBearerAuth()
@@ -33,20 +36,29 @@ export class SnapshotsController {
 
   @Get()
   @ApiOperation({ summary: 'List all snapshots' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'environmentId', required: false })
   @ApiQuery({ name: 'type', required: false, enum: SnapshotType })
   @ApiQuery({ name: 'isGoldenImage', required: false, type: Boolean })
   async findAll(
     @CurrentUser('id') userId: string,
+    @Query() pagination: PaginationDto,
     @Query('environmentId') environmentId?: string,
     @Query('type') type?: SnapshotType,
     @Query('isGoldenImage') isGoldenImage?: string,
   ) {
-    return this.snapshotsService.findAll(userId, {
+    const result = await this.snapshotsService.findAllPaginated(userId, pagination, {
       environmentId,
       type,
       isGoldenImage: isGoldenImage === 'true' ? true : isGoldenImage === 'false' ? false : undefined,
     });
+
+    return {
+      success: true,
+      data: result.data,
+      meta: result.meta,
+    };
   }
 
   @Get(':id')
@@ -63,9 +75,9 @@ export class SnapshotsController {
   async restore(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() options: RestoreSnapshotOptions,
+    @Body() dto: RestoreSnapshotDto,
   ) {
-    return this.snapshotsService.restoreSnapshot(id, userId, options);
+    return this.snapshotsService.restoreSnapshot(id, userId, dto);
   }
 
   @Post(':id/set-golden-image')
