@@ -1,0 +1,240 @@
+{
+  "status": "failed",
+  "errors": [
+    "Schema contract not found: /Users/james.mcdaniel/PeopleI.AI_TB_Clone/onboarding/schema_contract.json",
+    "Model spec role mapping missing required inputs.",
+    "Model spec role mapping missing required outputs.",
+    "Model spec role mapping missing metadata fields.",
+    "Production log file not found: /Users/james.mcdaniel/PeopleI.AI_TB_Clone/monora_events.jsonl",
+    "Insufficient production log records: found 0, required 100",
+    "Schema contract missing JSON schema object."
+  ],
+  "warnings": [],
+  "coverage": {
+    "records": 0,
+    "dataset_sample_records": 0,
+    "required_field_presence_threshold": 0.95,
+    "type_conformance_threshold": 0.9,
+    "field_presence": {},
+    "field_type_conformance": {},
+    "enrichment_plan": {
+      "bundles": [
+        "core_observability",
+        "soc2_access",
+        "gdpr_privacy",
+        "iso27001_security"
+      ],
+      "unknown_bundles": [],
+      "toggle_states": {
+        "identity_tracking": true,
+        "risk_tracking": true,
+        "bias_tracking": false,
+        "oversight_tracking": true,
+        "data_governance_tracking": true,
+        "lifecycle_tracking": true
+      },
+      "applied_capabilities": [
+        "core_observability",
+        "soc2_access",
+        "gdpr_privacy",
+        "iso27001_security"
+      ],
+      "target_settings": {
+        "tracing.emit_span_events": true,
+        "immutability.enabled": true,
+        "immutability.verify_on_emit": true,
+        "policies.enforce": true,
+        "registry.allow_unknown": false,
+        "identity.enabled": true,
+        "identity.require_user_id": true,
+        "data_handling.enabled": true,
+        "data_handling.mode": "redact",
+        "data_governance.enabled": true,
+        "signing.enabled": true,
+        "wal.enabled": true,
+        "wal.sync_mode": "fsync",
+        "reporting.include_security_report": true,
+        "risk_register.enabled": true,
+        "bias.enabled": false,
+        "human_oversight.enabled": true,
+        "lifecycle.enabled": true
+      },
+      "current_settings": {
+        "tracing.emit_span_events": null,
+        "immutability.enabled": true,
+        "immutability.verify_on_emit": false,
+        "policies.enforce": true,
+        "registry.allow_unknown": true,
+        "identity.enabled": false,
+        "identity.require_user_id": false,
+        "data_handling.enabled": false,
+        "data_handling.mode": "redact",
+        "data_governance.enabled": false,
+        "signing.enabled": false,
+        "wal.enabled": true,
+        "wal.sync_mode": "fsync",
+        "reporting.include_security_report": false,
+        "risk_register.enabled": false,
+        "bias.enabled": false,
+        "human_oversight.enabled": false,
+        "lifecycle.enabled": false
+      },
+      "unapplied_settings": [
+        "tracing.emit_span_events",
+        "immutability.verify_on_emit",
+        "registry.allow_unknown",
+        "identity.enabled",
+        "identity.require_user_id",
+        "data_handling.enabled",
+        "data_governance.enabled",
+        "signing.enabled",
+        "reporting.include_security_report",
+        "risk_register.enabled",
+        "human_oversight.enabled",
+        "lifecycle.enabled"
+      ]
+    },
+    "profiling": {
+      "production_logs": {
+        "records_profiled": 0,
+        "records_truncated": false,
+        "field_profiles": {
+          "event_id": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "trace_id": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "span_id": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "event_type": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "timestamp": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "service_name": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          }
+        }
+      },
+      "dataset_sample": {
+        "records_profiled": 0,
+        "records_truncated": false,
+        "field_profiles": {
+          "event_id": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "trace_id": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "span_id": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "event_type": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "timestamp": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          },
+          "service_name": {
+            "presence_ratio": 0,
+            "present_count": 0,
+            "null_count": 0,
+            "distinct_count": 0,
+            "types": {},
+            "sample_values": []
+          }
+        }
+      }
+    },
+    "inference": {
+      "current_roles": {
+        "inputs": [],
+        "outputs": [],
+        "metadata": [],
+        "identifiers": [
+          "event_id",
+          "trace_id",
+          "span_id"
+        ]
+      },
+      "suggested_roles": {
+        "inputs": [],
+        "outputs": [],
+        "metadata": [],
+        "identifiers": []
+      },
+      "suggested_event_ts_field": "timestamp",
+      "monitorable_fields": [],
+      "schema_mapping_gaps": [
+        "event_id",
+        "span_id",
+        "trace_id"
+      ]
+    }
+  },
+  "artifacts": {
+    "production_logs_path": "/Users/james.mcdaniel/PeopleI.AI_TB_Clone/monora_events.jsonl",
+    "schema_contract_path": "/Users/james.mcdaniel/PeopleI.AI_TB_Clone/onboarding/schema_contract.json",
+    "dataset_sample_path": null,
+    "baseline_reports_dir": "/Users/james.mcdaniel/PeopleI.AI_TB_Clone/monora_reports/onboarding",
+    "validation_report_path": "/Users/james.mcdaniel/PeopleI.AI_TB_Clone/monora_reports/onboarding/onboarding_validation.json"
+  }
+}

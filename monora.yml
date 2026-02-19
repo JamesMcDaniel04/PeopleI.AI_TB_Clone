@@ -1,0 +1,294 @@
+config_version: 1.0.0
+defaults:
+  data_classification: internal
+  purpose: general
+  environment: production
+  service_name: testbox-clone
+sinks:
+  - type: file
+    path: ./logs/monora_events.jsonl
+    rotation: daily
+    symlink: true
+immutability:
+  enabled: true
+  scope: per_trace
+  hash_algorithm: sha256
+  verify_on_emit: false
+  verify_on_shutdown: true
+  persist_chain: false
+registry:
+  version: 1.1.0
+  history:
+    - version: 1.0.0
+      date: '2024-05-13'
+      changes:
+        - Initial registry with OpenAI and Anthropic providers
+        - Added GPT-4o, GPT-3.5 Turbo, and Claude 3 model entries
+    - version: 1.1.0
+      date: '2024-12-26'
+      changes:
+        - Added GPT-4o mini and Claude 3.5 Sonnet model entries
+        - Added DeepSeek provider and deepseek-chat model
+        - Marked DeepSeek provider deprecated (v0.x models)
+  default_provider: unknown
+  allow_unknown: true
+  providers:
+    - name: openai
+      model_patterns:
+        - gpt-*
+        - o1-*
+      deprecated: false
+    - name: anthropic
+      model_patterns:
+        - claude-*
+      deprecated: false
+    - name: deepseek
+      model_patterns:
+        - deepseek:*
+        - deepseek*
+      deprecated: true
+      deprecation_message: DeepSeek v0.x models are deprecated
+instrumentation:
+  enabled: true
+  auto_patch: true
+  targets:
+    - openai
+    - anthropic
+  fail_fast: false
+reporting:
+  enabled: true
+  emit_trust_summary: true
+  output_dir: ./monora_reports
+  formats:
+    - json
+  include_security_report: false
+  max_events_per_trace: 10000
+  redact_host: true
+  trust_bundle_include_events: true
+data_handling:
+  enabled: false
+  mode: redact
+  apply_to:
+    - request
+    - response
+    - tool_args
+    - tool_result
+    - agent_input
+    - agent_output
+    - custom
+  rules: []
+policies:
+  model_allowlist: []
+  model_denylist: []
+  tool_allowlist: []
+  tool_denylist: []
+  classification_max_models: {}
+  enforce: true
+alerts:
+  headers: {}
+  timeout_sec: 5
+  retry_attempts: 3
+  backoff_base_sec: 0.5
+  queue_size: 200
+error_handling:
+  sink_failure_mode: warn
+  log_user_exceptions: true
+  queue_full_mode: warn
+  fallback_path: ./monora_fallback.jsonl
+buffering:
+  queue_size: 1000
+  batch_size: 50
+  flush_interval_sec: 1
+  queue_full_timeout_sec: null
+  adaptive_batching: true
+  min_batch_size: 10
+  max_batch_size: 500
+wal:
+  enabled: true
+  path: ./monora_wal
+  sync_mode: fsync
+  max_file_size_mb: 100
+  retention_hours: 24
+  recovery_on_startup: true
+signing:
+  enabled: false
+  algorithm: ed25519
+  key_id: null
+  key_file: null
+  key_env: MONORA_SIGNING_KEY
+ai_act:
+  enabled: false
+  organization_name: null
+  contact_email: null
+  default_risk_category: limited
+  generate_transparency_report: true
+  transparency_report_formats:
+    - json
+telemetry:
+  enabled: true
+  backend: minimal
+attribution:
+  enabled: false
+  project: {}
+  telemetry:
+    enabled: false
+    send_data: false
+    data_residency: null
+    endpoints:
+      us: null
+      eu: null
+    api_key_env: MONORA_ATTRIBUTION_KEY
+    timeout_sec: 5
+    retry_attempts: 2
+    backoff_base_sec: 0.5
+audit: {}
+quotas:
+  enabled: false
+  max_tokens_per_trace: 100000
+  max_llm_calls_per_trace: 50
+  max_trace_duration_sec: 3600
+  max_cost_per_trace: 10
+  action: warn
+identity:
+  enabled: false
+  require_user_id: false
+  capture_roles: false
+  capture_org: false
+  redact_user_id: false
+risk_register:
+  enabled: false
+  models: {}
+  default_risk_level: high
+  block_unassessed: false
+bias:
+  enabled: false
+  dimensions: []
+  thresholds:
+    demographic_parity_ratio: 0.8
+    disparate_impact: 0.8
+  alert_on_violation: true
+  measurement_callback: null
+human_oversight:
+  enabled: false
+  require_review_for: []
+  review_timeout_hours: 24
+  escalation_policy:
+    timeout_action: alert
+    escalate_to: null
+impact_assessment:
+  enabled: false
+  require_before_production: true
+  review_interval_days: 365
+  categories:
+    - fairness
+    - privacy
+    - safety
+    - autonomy
+    - economic
+    - environmental
+  require_approvals:
+    - role: ai_governance
+    - role: legal
+    - role: ethics_board
+  risk_matrix:
+    likelihood_weights:
+      rare: 1
+      unlikely: 2
+      possible: 3
+      likely: 4
+      certain: 5
+    severity_weights:
+      minimal: 1
+      minor: 2
+      moderate: 3
+      major: 4
+      catastrophic: 5
+lifecycle:
+  enabled: false
+  require_objectives: true
+  require_requirements: true
+  require_v_and_v: true
+  stage_prerequisites:
+    testing:
+      - requirements_defined
+    staging:
+      - verification_complete
+    production:
+      - validation_complete
+      - deployment_approved
+    deprecated:
+      - decommission_plan
+data_governance:
+  enabled: false
+  require_quality_assessment: true
+  default_quality_thresholds:
+    completeness: 0.95
+    accuracy: 0.9
+    consistency: 0.95
+    timeliness: 0.8
+    uniqueness: 0.99
+    representativeness: 0.7
+  require_bias_assessment_for:
+    - training
+    - validation
+stakeholders:
+  enabled: false
+  require_supplier_assessment: true
+  supplier_review_interval_days: 365
+  risk_thresholds:
+    critical_requires_approval: true
+    high_requires_review: true
+resources:
+  enabled: false
+  require_tooling_approval: true
+  policy_review_interval_days: 365
+  track_competencies: true
+onboarding:
+  enabled: false
+  required_in_production: true
+  status: draft
+  standards:
+    - SOC2
+    - GDPR
+    - ISO27001
+    - ISO42001
+  artifacts:
+    production_logs_path: ./monora_events.jsonl
+    schema_contract_path: ./onboarding/schema_contract.json
+    dataset_sample_path: null
+    baseline_reports_dir: ./monora_reports/onboarding
+  validation:
+    min_log_records: 100
+    required_field_presence_threshold: 0.95
+    type_conformance_threshold: 0.9
+  completion:
+    completed_at: null
+    completed_by: null
+    last_validated_at: null
+model_spec:
+  name: monora_default
+  version: v1
+  event_ts_field: timestamp
+  schema_ref: ./onboarding/schema_contract.json
+  roles:
+    inputs: []
+    outputs: []
+    metadata: []
+    identifiers:
+      - event_id
+      - trace_id
+      - span_id
+enrichments:
+  profile: recommended
+  bundles:
+    - core_observability
+    - soc2_access
+    - gdpr_privacy
+    - iso27001_security
+  toggles:
+    identity_tracking: true
+    risk_tracking: true
+    bias_tracking: false
+    oversight_tracking: true
+    data_governance_tracking: true
+    lifecycle_tracking: true
